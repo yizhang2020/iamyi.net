@@ -1,2 +1,2 @@
 # iamyi.net
-personal profile and collection of security topic related writings
+personal profile and collection of my writings relate to security
