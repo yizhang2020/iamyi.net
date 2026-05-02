@@ -3,9 +3,12 @@ name: Deploy Site
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
+# Build must upload a workflow artifact; deploy must read it and publish to Pages.
 permissions:
   contents: read
+  actions: write
   pages: write
   id-token: write
 
@@ -16,7 +19,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,6 +37,12 @@ jobs:
       - run: |
           mkdocs build --clean
 
+      - name: Verify static site output
+        run: |
+          test -f site/index.html
+          test -s site/index.html
+          echo "Built site root:" && ls -la site | head -20
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -42,6 +50,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -50,3 +50,7 @@ Run:
 ```
 
 The script starts `zensical serve` and watches `mkdocs.yml` for changes. If your site configuration includes other files, add them to `WATCH_PATHS` in `start.sh`.
+
+## GitHub Pages
+
+Production builds use **`mkdocs build`** (see `.github/workflows/deploy.yml` and `./build-site.sh`). In the repo **Settings → Pages**, set **Source** to **GitHub Actions**, not “Deploy from a branch.” If Source points at the branch root, GitHub serves files from the repo (where there is no `index.html`), which often looks like only **`README.md`** instead of the built site under `site/`.

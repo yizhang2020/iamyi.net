@@ -90,51 +90,7 @@ Create file:
 .github/workflows/deploy.yml
 ```
 
-Use:
-
-```yaml
-name: Deploy Site
-
-on:
-  push:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: |
-          pip install -r requirements.txt
-
-      - run: |
-          python tools/gen_cases_index.py || true
-
-      - run: |
-          zensical build --clean
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/deploy-pages@v4
-```
+Use the version checked into this repository (summary: `checkout` with full git history, `pip install`, `mkdocs build --clean`, verify `site/index.html`, `upload-pages-artifact` with `path: site`, then `deploy-pages`). The workflow must grant **`actions: write`** on the build path so the Pages artifact can upload when you set restrictive top-level permissions.
 
 ---
 
@@ -151,6 +107,8 @@ Set:
 ```text
 Source: GitHub Actions
 ```
+
+**Troubleshooting — the live site only shows `README.md`:** almost always means Pages is still publishing the **repository branch** (for example **Deploy from a branch → `main` → `/ (root)`**), which has no `index.html` at the repo root, so GitHub falls back to rendering the README. Switch **Build and deployment → Source** to **GitHub Actions**, save, then re-run the workflow (push a commit or use **Actions → Deploy Site → Run workflow**). Wait until the **deploy** job finishes and the environment shows the new deployment.
 
 After deployment, your site is available at:
 
