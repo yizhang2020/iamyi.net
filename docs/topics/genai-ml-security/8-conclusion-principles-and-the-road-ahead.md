@@ -74,7 +74,7 @@ The following principles summarize the analytical lens used throughout this mini
 
 ## GenAI security maturity model (conceptual)
 
-![GenAI maturity model (illustrative)](../assets/image-20260101-150320.png)
+![GenAI maturity model (illustrative)](assets/image-20260101-150320.png)
 
 *Caption inspiration: “The GenAI maturity model.”*
 

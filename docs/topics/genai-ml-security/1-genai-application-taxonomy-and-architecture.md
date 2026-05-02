@@ -75,7 +75,7 @@ Agentic systems extend GenAI beyond text generation. The model can plan, decide,
 
 A typical single AI agent system is often illustrated with a high-level diagram (place image files next to this page under `assets/`):
 
-![Top agentic AI design patterns for architecting AI systems](../assets/image-20251231-142120.png)
+![Top agentic AI design patterns for architecting AI systems](assets/image-20251231-142120.png)
 
 *Caption (source notes in original material): “Top Agentic AI Design Patterns for Architecting AI Systems.”*
 
@@ -110,7 +110,7 @@ In this model, organizations modify a base model through fine-tuning or custom t
 
 **Security implication:** training data and pipelines become part of the **attack surface**.
 
-![Training and deployment architecture (illustrative)](../assets/image-20251230-024922.png)
+![Training and deployment architecture (illustrative)](assets/image-20251230-024922.png)
 
 **Diagram references:**
 
@@ -131,7 +131,7 @@ Most real-world systems combine GenAI components with existing microservices, wo
 
 *Example: LLM assistant chatbot architecture.*
 
-![Hybrid / chatbot architecture (illustrative)](../assets/image-20251230-030354.png)
+![Hybrid / chatbot architecture (illustrative)](assets/image-20251230-030354.png)
 
 **Diagram references:**
 

@@ -36,7 +36,7 @@ Security risk emerges **between these stages**, not only at the input boundary.
 
 Some sample architectures are shown below (place image files under `docs/topics/genai-ml-security/assets/`).
 
-![Architecture of a GenAI application (illustrative)](../assets/image-20251230-175706.png)
+![Architecture of a GenAI application (illustrative)](assets/image-20251230-175706.png)
 
 *Caption inspiration: “Beyond proof of concept: building RAG systems that scale” (common RAG architecture themes).*
 
@@ -109,9 +109,9 @@ Because models have **finite context windows**, systems must truncate, summarize
 
 **General flow** of how context is built for a prompt:
 
-![Context build-up for a prompt (illustrative)](../assets/image-20251230-180925.png)
+![Context build-up for a prompt (illustrative)](assets/image-20251230-180925.png)
 
-![Context assembly — additional view (illustrative)](../assets/image-20251230-181301.png)
+![Context assembly — additional view (illustrative)](assets/image-20251230-181301.png)
 
 *Caption inspiration: “Context engineering” and layered context in intelligent systems.*
 
@@ -152,7 +152,7 @@ Many GenAI systems allow models to invoke **tools** or **functions** based on in
 - Cloud resource management
 - External service integrations
 
-![Tools vs. function calls (illustrative)](../assets/image-20251230-182737.png)
+![Tools vs. function calls (illustrative)](assets/image-20251230-182737.png)
 
 *Diagram reference: Cobus Greyling — tools vs. function calls (e.g. discussion on LinkedIn).*
 

@@ -79,7 +79,7 @@ Traditional trust boundaries are enforced through interfaces, authentication, an
 
 These boundaries are often **undocumented**, **unenforced**, or assumed safe.
 
-![Trust and control flow (illustrative)](../assets/image-20251230-030753.png)
+![Trust and control flow (illustrative)](assets/image-20251230-030753.png)
 
 *Placeholder figure — add a more detailed caption or replace when a final diagram is available.*
 

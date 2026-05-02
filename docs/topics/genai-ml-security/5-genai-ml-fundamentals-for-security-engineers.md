@@ -32,7 +32,7 @@ Machine learning systems introduce stages that do not exist in traditional softw
 4. Deployment and inference
 5. Feedback and continual adaptation
 
-![ML lifecycle (security-oriented view)](../assets/material/architecture-ml-lifecycle.png)
+![ML lifecycle (security-oriented view)](assets/material/architecture-ml-lifecycle.png)
 
 Security risk **accumulates across stages**; controls applied only at inference are **insufficient**.
 
@@ -115,7 +115,7 @@ Modern GenAI systems frequently incorporate **feedback** after deployment:
 - Automated feedback (tool outcomes, user behavior)
 - Reinforcement learning (explicit or implicit)
 
-![Reinforcement learning from human feedback (illustrative)](../assets/image-20251231-161700.png)
+![Reinforcement learning from human feedback (illustrative)](assets/image-20251231-161700.png)
 
 *Caption inspiration: RLHF and related alignment / feedback pipelines.*
 

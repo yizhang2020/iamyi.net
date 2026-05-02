@@ -57,7 +57,7 @@ MLSecOps pipelines introduce additional stages beyond CI/CD:
 6. Runtime monitoring
 7. Feedback ingestion & re-training
 
-![MLSecOps / LLM security pipeline (illustrative)](../assets/image-20251231-173833.png)
+![MLSecOps / LLM security pipeline (illustrative)](assets/image-20251231-173833.png)
 
 *Caption inspiration: “MLSecOps: secure your large language model (LLM) applications.”*
 
@@ -103,7 +103,7 @@ In MLSecOps, evaluation gates replace binary “build passes.”
 | Leakage checks | Memorization & inference risks |
 | Drift baselines | Detect behavioral change |
 
-![Evaluation of LLM-based applications (illustrative)](../assets/image-20260101-143847.png)
+![Evaluation of LLM-based applications (illustrative)](assets/image-20260101-143847.png)
 
 *Caption inspiration: “Steady the course: navigating the evaluation of LLM-based applications.”*
 
@@ -133,7 +133,7 @@ Feedback is powerful—and dangerous.
 
 The following illustrates an architectural option that **isolates the feedback loop** from the rest of the machine learning pipeline:
 
-![Strategic feedback loops in ML systems (illustrative)](../assets/image-20260101-145452.png)
+![Strategic feedback loops in ML systems (illustrative)](assets/image-20260101-145452.png)
 
 *Caption inspiration: “Elevating machine learning systems through strategic feedback loops.”*
 

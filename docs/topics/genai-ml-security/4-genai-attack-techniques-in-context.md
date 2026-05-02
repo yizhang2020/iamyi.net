@@ -42,7 +42,7 @@ This distinction is critical: many GenAI attacks succeed even when the system be
 
 Both exploit the same weakness: **lack of enforced instruction boundaries**.
 
-![Direct and indirect prompt injection](../assets/material/prompt-injections.png)
+![Direct and indirect prompt injection](assets/material/prompt-injections.png)
 
 ### Why it works
 
@@ -115,7 +115,7 @@ In RAG systems, retrieved documents become part of the model’s context. Attack
 - Embedding hidden instructions in otherwise valid content
 - Triggering the retrieval of sensitive data through crafted queries
 
-![RAG / retrieval abuse (illustrative)](../assets/material/rag-and-poisoned-rag.png)
+![RAG / retrieval abuse (illustrative)](assets/material/rag-and-poisoned-rag.png)
 
 *See also:* [Security of AI agents](https://research.aimultiple.com/security-of-ai-agents/) (AI Multiple) — includes a structured treatment of agent threats and defenses.
 
@@ -392,8 +392,8 @@ Security controls must be **architectural**, not reactive.
 
 Reference diagrams (place files under `docs/topics/genai-ml-security/assets/`):
 
-![Overview — agentic AI threat categories (illustrative)](../assets/image-20251231-142940.png)
+![Overview — agentic AI threat categories (illustrative)](assets/image-20251231-142940.png)
 
-![Agentic AI security — mechanisms and controls (illustrative)](../assets/image-20251231-143623.png)
+![Agentic AI security — mechanisms and controls (illustrative)](assets/image-20251231-143623.png)
 
 *Caption inspiration: “Agentic AI Security: What It Is and How to Do It” (overview-style figures).*
