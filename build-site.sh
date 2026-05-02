@@ -11,6 +11,7 @@ mkdocs
 mkdocs-material
 pymdown-extensions
 mkdocs-git-revision-date-localized-plugin
+mkdocs-awesome-pages-plugin
 EOF
 
 if [[ ! -d .venv ]]; then
@@ -20,7 +21,6 @@ fi
 source .venv/bin/activate
 
 pip install -r requirements.txt
-python tools/gen_cases_index.py || true
 mkdocs build --clean
 
 echo "Built static site into: $ROOT/site/"

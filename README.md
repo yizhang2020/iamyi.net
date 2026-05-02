@@ -16,9 +16,9 @@ This site is built as a lightweight Markdown-based documentation site.
 
 - Content lives in `docs/` as Markdown files.
 - Source and reference materials live in `materials/` and should be treated as read-only.
-- The local development server is run with `zensical serve`.
-- `start.sh` wraps the local server and restarts it when the site config changes.
-- `fswatch` is used by `start.sh` to watch for config changes.
+- The local development server is run with **`mkdocs serve`** (same engine as `./build-site.sh`).
+- `./start.sh` activates `.venv`, installs dependencies if needed, and runs `mkdocs serve` (default `127.0.0.1:8000`; override with `MKDOCS_DEV_ADDR`). Live reload watches `docs/` and `mkdocs.yml`.
+- You can still run `zensical serve` manually if you prefer; production builds use `mkdocs build`.
 
 ## Rebuild A Similar Site
 
@@ -49,8 +49,10 @@ Run:
 ./start.sh
 ```
 
-The script starts `zensical serve` and watches `mkdocs.yml` for changes. If your site configuration includes other files, add them to `WATCH_PATHS` in `start.sh`.
+The script runs **`mkdocs serve`** so the preview matches the static build. If the page looks blank or styles are missing, do a full build once (`./build-site.sh`) and hard-refresh the browser; avoid opening `site/index.html` via `file://` (use `http://127.0.0.1:8000/` instead).
 
 ## GitHub Pages
 
 Production builds use **`mkdocs build`** (see `.github/workflows/deploy.yml` and `./build-site.sh`). In the repo **Settings → Pages**, set **Source** to **GitHub Actions**, not “Deploy from a branch.” If Source points at the branch root, GitHub serves files from the repo (where there is no `index.html`), which often looks like only **`README.md`** instead of the built site under `site/`.
+
+The home page **Latest writing** table is refreshed from your docs by `tools/gen_latest_writing.py` before each build (`./start.sh`, CI). YAML front matter (`title`, `keywords`, `description`) keeps titles and summaries tidy.

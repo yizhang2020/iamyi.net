@@ -1,78 +1,135 @@
-# Whoami
+---
+title: Whoami
+keywords:
+  - profile
+  - career
+  - security engineering
+description: Short journey from QA to staff security engineer, graduate study, and why I write.
+date: 2026-05-01
+---
 
-I am a security engineer with a long background in quality engineering and test automation. The short version of that path is below; the rest of this site is longer-form writing on security practice, architecture, and timely topics.
+I’m a **security engineer** who started my career in quality engineering and test automation. Over time, I’ve grown from testing systems to securing them end-to-end.
+
+This page is a short overview of that journey; the rest of the site dives deeper into my thoughts on security practice, architecture, and real-world challenges.
+
+* * *
 
 ## Background
 
-### AOL / Netscape (from 2004)
+### AOL / Netscape (2004)
 
-I started my career in 2004 at AOL/Netscape as a QA engineer. I worked on AOL Blog and AOL Uncut video (since discontinued) and was responsible for functional tests, API tests, and part of the DevOps work. I learned how to write test plans and early automation. I was fortunate to learn from a strong mentor: Orla Hegarty (Principal QA Engineer, now at Google).
+I began my career in 2004 at AOL/Netscape as a QA engineer, working on AOL Blog and AOL Uncut Video. My work focused on functional testing, API testing, and early DevOps practices.
 
-### Red Hat (from 2007)
-
-I joined Red Hat in 2007 as a system automation engineer on the IPA (Identity Management) project. I owned test automation across the connected backend stack: Kerberos, Certificate Server, AutoFS, Samba, NFS, Apache, NTP, and related services. I reported defects in public trackers during that time; some of those records may still be discoverable in Red Hat’s issue databases. I also earned RHCE while I was there.
-
-After roughly ten years in QA roles, I had a solid grounding in what good QA means and how to sustain meaningful test automation.
-
-### Amazon Lab126 (from 2013)
-
-In 2013 I joined Lab126/Amazon.com as an early member of the device security team. I ran the security lab and built the security automation framework and vulnerability management system for the device program from scratch. Beyond hands-on security testing, I took part in the full lifecycle of product security work: SCA-based vulnerability management, incident response, security on-call, application and service architecture review, and security risk assessment.
-
-### Graduate study: UC Berkeley - Cybersecurity (2020–2022)
-
-I returned to formal study starting in 2020. I completed a Graduate Certificate in Applied Data Science in December 2021 and a cybersecurity master’s from the [U.C. Berkeley School of Information online cybersecurity program](https://ischoolonline.berkeley.edu/cybersecurity/) in April 2022. The education refreshed my knowledge. I grew from learning *how* to understanding *why*.
+This was where I learned the fundamentals—test planning, automation, and disciplined engineering thinking—guided by a strong mentor, Orla Hegarty.
 
 
-### The Trade Desk (from 2023)
+### Red Hat (2007)
 
-In 2023 I left Lab126 and joined [The Trade Desk](https://www.thetradedesk.com/) as a staff security engineer. The security team here is much smaller; I am glad I made the move. A smaller team means not only more responsibility, but also a much broader question and problem space. I have been exposed to everything from application security to areas I touched less often before—infrastructure security, endpoint security, cloud security, data platform security, penetration testing, a bug bounty program, IT security hardening, VPN and gateway work with vendors, and more. I welcomed the opportunity.
+In 2007, I joined Red Hat as a system automation engineer on the Identity Management (IPA) project. I worked across a complex backend ecosystem—Kerberos, Samba, NFS, Apache, and more—owning end-to-end automation for distributed systems.
 
-Looking back from 2026, this is where I grew from a specialist in a narrow field into a security engineer who knows how to handle risk across domains.
+During this time, I also earned my **RHCE certification** and developed a deep understanding of what high-quality, sustainable QA really means.
 
-At first I was overwhelmed: uncertainty about whether I could cover it all. Then one day it clicked—that breadth and ambiguity *is* a large part of what “security” means in practice. I am closer than I have ever been to a grounded view of what security is and how to do the work well. I am not claiming mastery yet, but I am very close.
 
-That is part of why this site exists: I am finally opening some of those thoughts to the world—for you to judge, good or bad.
+### Amazon Lab126 (2013)
 
-### Graduate study: USC Gould School of Law — MLS (cybersecurity and privacy law) (2025)
+In 2013, I joined Amazon Lab126 as an early member of the device security team. I built the security lab, automation frameworks, and vulnerability management systems from scratch.
 
-I still anchor on technology and STEM, but the world is not run by science alone. Law, regulation, and institutions decide what is allowed, contested, or mandatory once you leave the lab.
+My work expanded into full lifecycle security, including:
 
-As a security engineer my aperture widened naturally—from an application, to a system, to an ecosystem, then to industry and, beyond any one company, society, government, and international expectations. Internal security work only reaches as far as management authority does. Past that edge, you need a different toolkit: law is where many conflicts are settled, where leverage can extend your influence, and where you are also constrained. A Master of Legal Studies (MLS) focused on cybersecurity and privacy at the [USC Gould School of Law](https://gould.usc.edu/) sharpens that lens—governance and economics read alongside technical risk, not instead of it.
+* Vulnerability management
+* Incident response and security on-call
+* Architecture reviews and risk assessment
+* Android app reverse engineering
+* ML-based malware classifier development
 
-### Trajectory
+This is where I fully transitioned into **security engineering as a discipline**, moving beyond testing into proactive defense and system-level thinking.
 
-Over more than two decades I moved through QA, SDET/system automation, and security engineering—and since 2023 at The Trade Desk that practice has stretched across domains (application security through cloud, data platforms, endpoint hardening, and broader programs). Graduate study at [Berkeley (cybersecurity)](https://ischoolonline.berkeley.edu/cybersecurity/) and USC Gould (MLS: cybersecurity and privacy law) adds depth on technical risk and on law, governance, and institutions outside any one company’s control. The through-line is the same: work from evidence, name trade-offs clearly, and weigh risk and benefit with the people who rely on the system in mind.
 
-> Every dot I created made me a better engineer.
+### Graduate Study — UC Berkeley (2020–2022)
 
-## Why I want to write: to help
+I returned to school to deepen my understanding, completing:
 
-What motivates me to write? The answer is simple: to help.
+* A Graduate Certificate in Applied Data Science (2021)
+* A Master’s in Cybersecurity (2022)
 
-I say that because I have been helped by many people along the way—and also because there was a moment when I was *not* helped, and it stayed with me.
+This experience helped me shift from *knowing how* to understanding why—a critical step in my growth.
 
-Near the end of my computer science bachelor’s program, the department told me I was short on U.S. “general education” coverage for very basic physics, math, and related requirements. I had already completed equivalents in high school in China (including in my junior years), and the university had my official transcripts from China. I was working in industry as an engineer; my first daughter had been born about a year earlier, and life was full. Retaking those topics through the prescribed path meant long prerequisite chains; doing it part-time would have stretched for years.
+---
 
-I had two realistic paths: ask my academic advisor to waive the requirements, or take the courses at a community college and transfer the credit. I scheduled a meeting, explained the situation carefully, and walked through why forcing a full re-seat of fundamentals did not match where I already was—academically or in life.
+### The Trade Desk (2023–Present)
 
-The professor listened patiently. At the end he said something like this: *I am the person who can waive these classes. But I will not. I will not help you. This is your problem to solve.*
+In 2023, I joined The Trade Desk as a **Staff Security Engineer**, and this has been the most transformative phase of my career so far.
 
-I was stunned. I did not beg. I left.
+Working in a smaller team expanded both my **scope and responsibility**. I’ve been involved across a wide range of areas, including application security, infrastructure and cloud security, endpoint hardening, data platform security, penetration testing, bug bounty programs, and vendor-facing security work such as VPNs and gateways.
 
-It took me roughly three extra years to finish what was required—three physics courses, one biology, and three calculus sequences—while staying busy with work and family. I never tired of learning, even when it meant relearning foundations I already knew in another system.
+More recently, I’ve also started working with **GenAI/ML and agentic security**, exploring how emerging systems introduce new attack surfaces and require different ways of thinking about risk.
 
-On the hard days I made myself a promise: I will not be the kind of person who had power to help in a small, humane way and chose not to.
+This role pushed me beyond specialization into a much broader view of security. At first, the breadth felt overwhelming—I wasn’t sure if I could cover everything effectively. But over time, something clicked: this ambiguity isn’t a problem to eliminate, it’s part of the job.
 
-So when I write here, the goal is plain: to help. If something I publish saves you an hour, reframes a risk, or makes you feel less alone in a hard trade-off, that is enough.
+Security in practice is not cleanly scoped. It spans systems, people, and decisions under uncertainty.
 
-## What I write here
+Today, I feel closer than ever to a grounded understanding of how to evaluate risk across domains and make decisions that hold up in the real world. I’m not claiming mastery yet, but I’m getting close to the kind of engineer I’ve been working toward becoming.
 
-This site collects notes and essays that sit somewhere between a lab notebook and published articles: architecture, product security, GenAI/ML safety and abuse, and occasional reactions to real-world incidents and industry shifts.
+This site exists in part because of that shift—I’m now ready to share those perspectives openly.
 
-## Contact
 
-[LinkedIn Profile: Yi Zhang](https://www.linkedin.com/in/yizhangid/)
+### Graduate Study — USC Gould School of Law (2025)
 
-## Colophon
+To complement my technical background, I pursued a Master of Legal Studies (MLS) focused on cybersecurity and privacy law.
 
-Built with [Zensical](https://github.com/zensical/zensical) and [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/). Source for the site lives in the linked repository from the footer when published.
+Security doesn’t stop at technology. Beyond system boundaries, law, regulation, and institutions define what is possible.
+
+This expanded my perspective—from systems to ecosystems, industries, and society—and strengthened my ability to navigate risk in both technical and regulatory contexts.
+
+
+## Trajectory
+
+Over more than two decades, I’ve moved through QA, automation, and into security engineering—and now into a role that spans multiple domains of security practice.
+
+My education at Berkeley and USC adds depth across both technical risk and legal frameworks.
+
+The constant through all of it:
+
+* Work from **evidence**
+* Be explicit about **trade-offs**
+* Keep the **people impacted by the system** in mind
+
+
+## Why I Write
+
+I write for a simple reason: **to help**.
+
+That belief comes from both the support I’ve received—and one experience that stayed with me for a long time.
+
+Years ago, when I was finishing my computer science degree, I ran into an unexpected problem. After submitting my graduation application, I was told I didn’t meet certain U.S. general education requirements—specifically in basic physics, math, and related subjects.
+
+The situation was frustrating because I had already completed equivalent coursework years earlier in China. At the same time, I was already working full-time as an engineer, and my first daughter had just been born. Life was busy, and going back to retake foundational courses from scratch didn’t make much sense given where I already was.
+
+I scheduled a meeting with my academic advisor and explained everything in detail—my background, the coursework I had already completed, and the practical constraints I was dealing with. I wasn’t asking for special treatment, just a fair evaluation of whether those requirements could be waived.
+
+The conversation was short.
+
+He listened, acknowledged that he understood the situation, and then said something along the lines of: *“I could help. But I won’t. This is your problem to solve.”*
+
+That was it.
+
+I left the room without saying much, but I remember the feeling clearly. It wasn’t just frustration—it was the realization that sometimes, even when help is possible and reasonable, it won’t be given.
+
+In the end, I took the only path available. I enrolled in community college courses and worked through the requirements one by one. It took me **three extra years**-I don’t regret doing the study. I’ve always enjoyed learning, even when it meant revisiting fundamentals I already knew from a different system.
+
+But that experience shaped a simple rule for myself:
+
+**If I’m ever in a position to help someone in a small, reasonable way, I will.**
+
+That’s the mindset I bring to writing here. If something I share saves you time, helps you think more clearly about a problem, or just makes a difficult situation feel a bit more manageable—that’s enough.
+
+
+## What I Write About
+
+This site is a collection of notes and essays on:
+
+* Security architecture and product security
+* GenAI / ML safety and abuse
+* Real-world incidents and industry shifts
+
+Think of it as somewhere between a lab notebook and a set of essays.

@@ -1,0 +1,109 @@
+/**
+ * Reusable table styling for iamyi.net (Material for MkDocs).
+ * Uses theme tokens so light/dark (teal palette) stay consistent.
+ *
+ * Opt out of this look for a specific table: use raw HTML
+ *   <table class="no-site-table">...</table>
+ */
+
+/* ---- Base: all content tables (not code-line tables) ---- */
+.md-typeset table:not(.highlighttable):not(.no-site-table) {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
+}
+
+/* ---- Header row: centered, bold, primary-tint background ---- */
+.md-typeset table:not(.highlighttable):not(.no-site-table) thead th {
+  text-align: center;
+  font-weight: 700;
+  vertical-align: middle;
+  padding: 0.65rem 0.9rem;
+  color: var(--md-default-fg-color);
+  border: 1px solid var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
+  /* Teal-tinted bar that tracks --md-primary-fg-color (theme primary) */
+  background-color: color-mix(
+    in srgb,
+    var(--md-primary-fg-color) 18%,
+    var(--md-default-bg-color)
+  );
+  border-bottom: 2px solid var(--md-primary-fg-color);
+}
+
+/* ---- Body cells ---- */
+.md-typeset table:not(.highlighttable):not(.no-site-table) tbody td {
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
+  vertical-align: top;
+}
+
+/* First column in body: emphasize labels / row titles */
+.md-typeset table:not(.highlighttable):not(.no-site-table) tbody td:first-child {
+  font-weight: 700;
+}
+
+/* ---- Zebra rows (alternating shade) ---- */
+.md-typeset table:not(.highlighttable):not(.no-site-table) tbody tr:nth-child(odd) {
+  background-color: var(--md-default-bg-color);
+}
+
+.md-typeset table:not(.highlighttable):not(.no-site-table) tbody tr:nth-child(even) {
+  background-color: color-mix(
+    in srgb,
+    var(--md-default-fg-color) 6%,
+    var(--md-default-bg-color)
+  );
+}
+
+/* Slightly stronger stripe in dark scheme for readability */
+[data-md-color-scheme="slate"]
+  .md-typeset
+  table:not(.highlighttable):not(.no-site-table)
+  tbody
+  tr:nth-child(even) {
+  background-color: color-mix(
+    in srgb,
+    var(--md-default-fg-color) 9%,
+    var(--md-default-bg-color)
+  );
+}
+
+/* ---- Fallback when color-mix is unavailable ---- */
+@supports not (background-color: color-mix(in srgb, white 50%, black)) {
+  .md-typeset table:not(.highlighttable):not(.no-site-table) thead th {
+    background-color: rgba(0, 150, 136, 0.14); /* teal-ish; light mode */
+  }
+  [data-md-color-scheme="slate"]
+    .md-typeset
+    table:not(.highlighttable):not(.no-site-table)
+    thead
+    th {
+    background-color: rgba(0, 172, 155, 0.22);
+  }
+  .md-typeset table:not(.highlighttable):not(.no-site-table) tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+  [data-md-color-scheme="slate"]
+    .md-typeset
+    table:not(.highlighttable):not(.no-site-table)
+    tbody
+    tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* ---- Secondary / muted explainer text (e.g. checklist one-liners) ---- */
+.md-typeset .explain-muted {
+  color: color-mix(in srgb, var(--md-typeset-color, var(--md-default-fg-color)) 58%, var(--md-default-bg-color));
+}
+
+@supports not (color: color-mix(in srgb, white 50%, black)) {
+  .md-typeset .explain-muted {
+    color: var(--md-default-fg-color--light, #5e6469);
+  }
+  [data-md-color-scheme="slate"] .md-typeset .explain-muted {
+    color: #9aa0a6;
+  }
+}

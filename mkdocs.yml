@@ -7,10 +7,29 @@ repo_name: iamyi.net
 
 copyright: Copyright &copy; 2026 Yi Zhang &mdash; Unless noted otherwise, content is licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
 
+hooks:
+  - mkdocs_hooks.py
+
+# Extra paths for `mkdocs serve` livereload (in addition to docs/ and mkdocs.yml).
+# We watch `overrides/` for theme templates; `tools/` and hook files are not watched to avoid
+# noisy rebuilds when editing generators. For those, edit mkdocs.yml or use start.sh’s restart.
+
+watch:
+  - overrides
+
+extra_css:
+  - stylesheets/tables.css
+
 docs_dir: docs
 site_dir: site
 
+validation:
+  nav:
+    omitted_files: ignore
+    absolute_links: ignore
+
 plugins:
+  - awesome-pages
   - search
   - git-revision-date-localized:
       enable_creation_date: true
@@ -21,37 +40,54 @@ plugins:
 # Authoring aid only; not a published page.
 exclude_docs: |
   incidents/_template-incident-note.md
+  includes/latest-writing.md
 
 theme:
   name: material
   custom_dir: overrides
+  # Teal + amber: calm, readable, a bit more “personal site” than default indigo.
   palette:
     - scheme: default
-      primary: indigo
+      primary: teal
+      accent: amber
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
+      primary: teal
+      accent: amber
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
 markdown_extensions:
+  - meta
+  - pymdownx.snippets:
+      base_path: docs
   - pymdownx.superfences
-  - pymdownx.highlight
+  - pymdownx.highlight  
 
 nav:
-  - Home: index.md
-  - About:
-      - Whoami: about/whoami.md
+  - Home: index.md  
   - Topics:
       - GenAI & ML security:
           - topics/genai-ml-security/index.md
-          - "Framing secure GenAI and ML": topics/genai-ml-security/Introduction - Framing Secure GenAI and ML.md
-  - Thoughts:
-      - thoughts/index.md
-      - "Security musings": thoughts/security-musings.md
-      - "Guardrails and the SE role": thoughts/guardrails-and-security-engineers-role.md
+          - "Framing secure GenAI and ML": topics/genai-ml-security/0-introduction-framing-secure-genai-and-ml.md
+          - "1. GenAI Application Taxonomy and Architecture": topics/genai-ml-security/1-genai-application-taxonomy-and-architecture.md
+          - "2. GenAI vs Traditional Applications": topics/genai-ml-security/2-genai-vs-traditional-applications.md
+          - "3. Core GenAI Programming Logic and Attack Surface": topics/genai-ml-security/3-core-genai-programming-logic-and-attack-surface.md
+          - "4. GenAI Attack Techniques in Context": topics/genai-ml-security/4-genai-attack-techniques-in-context.md
+          - "5. GenAI / ML Fundamentals for Security Engineers": topics/genai-ml-security/5-genai-ml-fundamentals-for-security-engineers.md
+          - "6. Securing the GenAI Application Lifecycle": topics/genai-ml-security/6-securing-the-genai-application-lifecycle.md
+          - "7. MLSecOps": topics/genai-ml-security/7-mlsecops.md
+          - "8. Conclusion — Principles and the Road Ahead": topics/genai-ml-security/8-conclusion-principles-and-the-road-ahead.md
+          - "9. Secure GenAI / ML — Executive Summary": topics/genai-ml-security/9-secure-genai-ml-executive-summary.md
+          - "10. Appendix — Additional Resources": topics/genai-ml-security/10-appendix-additional-resources.md
+          - "EMO draft (archived export)": EMO-Introduction — Framing Secure GenAI and ML-010526-034204.md
+  - Security musings:
+      - Browse: security-musings/index.md
+      - "... | flat | glob=security-musings/**/*.md"
   - Incidents & trends:
-      - incidents/index.md
+      - incidents/index.md 
+  - About:
+      - Whoami: about/whoami.md

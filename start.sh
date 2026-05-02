@@ -1,71 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
 
-CONFIG_FILE="mkdocs.yml"
+# Local dev server:
+# - `tools/dev_serve.py` runs `mkdocs serve` and polls only mkdocs.yml (mtime). When the config
+#   file changes, it stops the server, runs regen_indexes, `mkdocs build --clean`, and starts
+#   serve again so theme/plugins/nav changes actually apply (livereload alone can leave a stale UI).
+# - Doc edits still use MkDocs’ normal watch of docs/ + mkdocs.yml; hooks run on each rebuild via
+#   mkdocs_hooks.py.
+# - `watch:` in mkdocs.yml includes `overrides/` for theme hot-reload; `tools/` is not watched
+#   to avoid noisy rebuilds when editing generators. For hook/tool changes, edit mkdocs.yml or
+#   rely on dev_serve’s mkdocs.yml restart.
 
-# You can tweak these if needed
-ZEN_CMD=("zensical" "serve")
-WATCH_PATHS=("mkdocs.yml")
+if [[ ! -d .venv ]]; then
+  python3 -m venv .venv
+fi
+# shellcheck source=/dev/null
+source .venv/bin/activate
+pip install -q -r requirements.txt
 
-# Also restart when nav/theme/plugin config changes elsewhere, if you keep them:
-# WATCH_PATHS+=("requirements.txt" "main.py")
-
-run_server() {
-  # Run zensical serve, hide output unless it errors.
-  # If it exits non-zero, print the captured log.
-  local log_file
-  log_file="$(mktemp -t zensical_serve_XXXXXX.log)"
-
-  echo "Starting: ${ZEN_CMD[*]} (output suppressed; errors will be shown)"
-  # Note: use stdbuf if you see buffering issues; not always available on mac.
-  "${ZEN_CMD[@]}" >"$log_file" 2>&1 &
-  local pid=$!
-
-  # Wait for process to exit (normally you won't hit this unless it errors or is killed)
-  wait "$pid" || {
-    echo "❌ zensical exited with error. Showing logs:"
-    cat "$log_file"
-    rm -f "$log_file"
-    return 1
-  }
-
-  rm -f "$log_file"
-}
-
-kill_server() {
-  local pid="$1"
-  if kill -0 "$pid" >/dev/null 2>&1; then
-    echo "Stopping server (pid=$pid)..."
-    kill "$pid" >/dev/null 2>&1 || true
-    # Give it a moment to exit
-    sleep 0.3
-    # Force kill if needed
-    kill -9 "$pid" >/dev/null 2>&1 || true
-  fi
-}
-
-start_loop() {
-  local log_file
-  log_file="$(mktemp -t zensical_serve_XXXXXX.log)"
-
-  echo "Starting: ${ZEN_CMD[*]} (output suppressed; errors will be shown)"
-  "${ZEN_CMD[@]}" >"$log_file" 2>&1 &
-  local pid=$!
-  echo "Server PID: $pid"
-
-  # Watch mkdocs.yml; restart on change
-  # -o emits an event count; -1 is not used because we want continuous
-  fswatch -o "${WATCH_PATHS[@]}" | while read -r _; do
-    echo "Detected change in mkdocs.yml -> restarting..."
-    kill_server "$pid"
-
-    # Start again (new temp log each time)
-    rm -f "$log_file"
-    log_file="$(mktemp -t zensical_serve_XXXXXX.log)"
-    "${ZEN_CMD[@]}" >"$log_file" 2>&1 &
-    pid=$!
-    echo "Server PID: $pid"
-  done
-}
-
-start_loop
+exec python "$ROOT/tools/dev_serve.py" "$@"
