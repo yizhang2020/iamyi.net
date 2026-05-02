@@ -1,0 +1,56 @@
+site_name: iamyi.net
+site_url: https://iamyi.net
+site_description: Personal profile and writings about security.
+site_author: Yi Zhang
+repo_url: https://github.com/yizhang2020/iamyi.net
+repo_name: iamyi.net
+
+copyright: Copyright &copy; 2026 Yi Zhang &mdash; Unless noted otherwise, content is licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+
+docs_dir: docs
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: date
+      fallback_to_build_date: true
+      enable_git_follow: false
+
+# Authoring aid only; not a published page.
+exclude_docs: |
+  incidents/_template-incident-note.md
+
+theme:
+  name: material
+  custom_dir: overrides
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.highlight
+
+nav:
+  - Home: index.md
+  - About:
+      - Whoami: about/whoami.md
+  - Topics:
+      - GenAI & ML security:
+          - topics/genai-ml-security/index.md
+          - "Framing secure GenAI and ML": topics/genai-ml-security/Introduction - Framing Secure GenAI and ML.md
+  - Thoughts:
+      - thoughts/index.md
+      - "Security musings": thoughts/security-musings.md
+      - "Guardrails and the SE role": thoughts/guardrails-and-security-engineers-role.md
+  - Incidents & trends:
+      - incidents/index.md

@@ -1,0 +1,5 @@
+zensical
+mkdocs
+mkdocs-material
+pymdown-extensions
+mkdocs-git-revision-date-localized-plugin
