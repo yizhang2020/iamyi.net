@@ -83,7 +83,6 @@ nav:
           - "8. Conclusion — Principles and the Road Ahead": topics/genai-ml-security/8-conclusion-principles-and-the-road-ahead.md
           - "9. Secure GenAI / ML — Executive Summary": topics/genai-ml-security/9-secure-genai-ml-executive-summary.md
           - "10. Appendix — Additional Resources": topics/genai-ml-security/10-appendix-additional-resources.md
-          - "EMO draft (archived export)": EMO-Introduction — Framing Secure GenAI and ML-010526-034204.md
   - Security musings:
       - Browse: security-musings/index.md
       - "... | flat | glob=security-musings/**/*.md"

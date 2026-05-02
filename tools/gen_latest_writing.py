@@ -21,7 +21,6 @@ MAX_ROWS = 10
 SKIP_REL = frozenset(
     {
         "incidents/_template-incident-note.md",
-        "EMO-Introduction — Framing Secure GenAI and ML-010526-034204.md",
     }
 )
 
