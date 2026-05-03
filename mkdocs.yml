@@ -8,7 +8,7 @@ repo_name: iamyi.net
 copyright: Copyright &copy; 2026 Yi Zhang &mdash; Unless noted otherwise, content is licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
 
 hooks:
-  - mkdocs_hooks.py
+  - mkdocs_hooks.py 
 
 # Extra paths for `mkdocs serve` livereload (in addition to docs/ and mkdocs.yml).
 # We watch `overrides/` for theme templates; `tools/` and hook files are not watched to avoid
@@ -87,6 +87,6 @@ nav:
       - Browse: security-musings/index.md
       - "... | flat | glob=security-musings/**/*.md"
   - Incidents & trends:
-      - incidents/index.md 
+      - incidents/index.md
   - About:
       - Whoami: about/whoami.md

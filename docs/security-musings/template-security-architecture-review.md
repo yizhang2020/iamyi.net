@@ -1,9 +1,26 @@
 ---
 title: "Template — Security architecture review document"
 description: Reusable outline for application context, risk, architecture, controls, and references in a security architecture review.
+date: 2026-05-02
+keywords:
+  - security architecture review
+  - template
+  - checklist
+  - threat modeling
+  - CIA
+  - application security
+  - risk analysis
 ---
 
 # Template — Security architecture review document
+
+## Preface: why use a template?
+
+A template is a **living document**: it collects feedback over time and keeps security reviews **consistent** within a given security domain—such as **application security**, **network security**, or **cloud security**.
+
+It carries a **shared mindset** for how to run the work: a common way of thinking, a **dedicated process**, and practices that can **evolve** as threats, stacks, and ownership change.
+
+Treat this document as an **initial base**. **Customize** it for each domain and organization (scope, controls, evidence, and vocabulary) so the review matches how risk is actually owned and decided where you operate.
 
 <p class="explain-muted">Use this as a checklist when preparing or recording a <strong>security architecture review</strong>: it ties business intent to technical design, explicit risks, and control coverage so reviewers and owners share the same picture.</p>
 
