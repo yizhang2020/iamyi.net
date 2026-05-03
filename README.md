@@ -54,5 +54,3 @@ The script runs **`mkdocs serve`** so the preview matches the static build. If t
 ## GitHub Pages
 
 Production builds use **`mkdocs build`** (see `.github/workflows/deploy.yml` and `./build-site.sh`). In the repo **Settings → Pages**, set **Source** to **GitHub Actions**, not “Deploy from a branch.” If Source points at the branch root, GitHub serves files from the repo (where there is no `index.html`), which often looks like only **`README.md`** instead of the built site under `site/`.
-
-The home page **Latest writing** table is refreshed from your docs by `tools/gen_latest_writing.py` before each build (`./start.sh`, CI). YAML front matter (`title`, `keywords`, `description`) keeps titles and summaries tidy.
