@@ -55,13 +55,13 @@ theme:
         name: Switch to dark mode
     - scheme: slate
       primary: teal
-      accent: amber 
+      accent: amber
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
 markdown_extensions:
-  - meta
+  - meta 
   - pymdownx.snippets:
       base_path: docs
   - pymdownx.superfences
