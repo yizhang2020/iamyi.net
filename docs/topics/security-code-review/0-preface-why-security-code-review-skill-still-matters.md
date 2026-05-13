@@ -243,8 +243,3 @@ Read the training chapters as a way to scale the skill across a team.
 
 The purpose of this book is not to make every reader a perfect reviewer. The purpose is to make security review more explainable, repeatable, and useful. That matters more as software creation becomes faster, broader, and more AI-assisted.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

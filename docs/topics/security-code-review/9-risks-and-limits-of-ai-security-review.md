@@ -97,8 +97,3 @@ The reviewer must control hallucination, missing context, unsafe fixes, prompt i
 
 The safest rule is simple: AI can propose. Evidence decides.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

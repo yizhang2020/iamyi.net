@@ -117,8 +117,3 @@ The reviewer maps the system, identifies critical assets, decomposes the scope, 
 
 The next chapter applies this method to business logic and authorization, where the most important risk is often hidden in workflow behavior.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

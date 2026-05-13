@@ -111,8 +111,3 @@ It is useful for semantic reasoning, explanation, triage, and hypothesis generat
 
 Treat fully automated LLM review as a powerful assistant pipeline. Do not treat it as final security authority.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

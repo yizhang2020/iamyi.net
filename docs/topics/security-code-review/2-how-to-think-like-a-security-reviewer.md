@@ -115,8 +115,3 @@ The reviewer reduces uncertainty, thinks in threats, verifies assumptions, respe
 
 The next chapter turns this discipline into a practical manual review method.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

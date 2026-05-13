@@ -124,8 +124,3 @@ It starts with the same engineering discipline: read the code, understand the in
 
 The next chapter builds on this by explaining how a security reviewer thinks through trust, attacker control, and uncertainty.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

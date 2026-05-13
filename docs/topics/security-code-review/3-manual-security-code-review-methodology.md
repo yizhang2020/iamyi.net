@@ -181,9 +181,3 @@ Automation finds repeatable patterns. Manual review examines meaning. It connect
 
 Use manual review where human judgment gives the most value: sensitive workflows, authorization boundaries, data flows, business rules, and exceptions that tools cannot decide.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `materials/book-security-code-review/secure-coding-in-practice.txt`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

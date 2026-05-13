@@ -98,8 +98,3 @@ Start with visible patterns. Move to data flow. Then train business context, thr
 
 The next chapter explains how to turn this training model into a repeatable internal review program.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

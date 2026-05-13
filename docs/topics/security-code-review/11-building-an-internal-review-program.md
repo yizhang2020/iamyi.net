@@ -89,8 +89,3 @@ It needs risk-based ownership, repeatable workflows, useful artifacts, automatio
 
 The goal is not to review everything with the same intensity. The goal is to put the right review depth on the right risk.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

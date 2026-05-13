@@ -102,8 +102,3 @@ The reviewer checks authentication at meaningful entry points and authorization 
 
 The next chapter moves from workflow-level review into detailed code-level security analysis.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

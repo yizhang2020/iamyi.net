@@ -71,8 +71,3 @@ Review the code. Review the assumptions. Review the tools. Review the AI output.
 
 Then leave behind evidence that another engineer can trust.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

@@ -401,9 +401,3 @@ It is a structured review of how data moves through code and what happens when t
 
 The next chapter moves from manual review skill to AI-assisted review workflows.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `materials/book-security-code-review/secure-coding-in-practice.txt`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`

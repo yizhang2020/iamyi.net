@@ -112,8 +112,3 @@ Let AI summarize, suggest, classify, and draft. Let humans verify context, explo
 
 The best result is faster review with clearer evidence.
 
-## Source References
-
-- `materials/book-security-code-review/book-outline.md`
-- `materials/book-security-code-review/book-outline-code-examples.md`
-- `docs/topics/security-code-review/secure-coding-in-practice.md`
