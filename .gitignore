@@ -220,3 +220,6 @@ __marimo__/
 # customized
 materials
 .cursor
+.obsidian/
+.DS_Store
+copilot/

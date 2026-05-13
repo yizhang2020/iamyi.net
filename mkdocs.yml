@@ -15,10 +15,10 @@ hooks:
 # noisy rebuilds when editing generators. For those, edit mkdocs.yml or use start.sh’s restart.
 
 watch:
-  - overrides
+  - overrides 
 
 extra_css:
-  - stylesheets/tables.css
+  - stylesheets/tables.css 
 
 docs_dir: docs
 site_dir: site
@@ -83,6 +83,26 @@ nav:
           - "8. Conclusion — Principles and the Road Ahead": topics/genai-ml-security/8-conclusion-principles-and-the-road-ahead.md
           - "9. Secure GenAI / ML — Executive Summary": topics/genai-ml-security/9-secure-genai-ml-executive-summary.md
           - "10. Appendix — Additional Resources": topics/genai-ml-security/10-appendix-additional-resources.md
+      - Security code review:
+          - topics/security-code-review/index.md
+          - "Preface - Why Security Code Review Skill Still Matters in the Age of AI": topics/security-code-review/0-preface-why-security-code-review-skill-still-matters.md
+          - "Part I - Build the Reviewer Mindset":
+              - "1. Define Security Code Review": topics/security-code-review/1-what-security-code-review-is.md
+              - "2. Think Like a Security Reviewer": topics/security-code-review/2-how-to-think-like-a-security-reviewer.md
+          - "Part II - Practice Manual Security Code Review":
+              - "3. Review Code Manually": topics/security-code-review/3-manual-security-code-review-methodology.md
+              - "4. Tracing Data From Source to Sink": topics/security-code-review/4-tracing-data-from-source-to-sink.md
+              - "5. Review Business Logic and Authorization": topics/security-code-review/5-reviewing-business-logic-and-authorization.md
+              - "6. Review Code-Level Vulnerabilities": topics/security-code-review/6-reviewing-code-level-vulnerabilities.md
+          - "Part III - Use AI in Security Code Review":
+              - "7. Use AI to Assist Human Review": topics/security-code-review/7-ai-assisted-human-review-workflow.md
+              - "8. Run Fully Automated LLM Review": topics/security-code-review/8-fully-automated-llm-review.md
+              - "9. Control the Risks of AI Review": topics/security-code-review/9-risks-and-limits-of-ai-security-review.md
+          - "Part IV - Scale Review Skill":
+              - "10. Train Security Reviewers": topics/security-code-review/10-training-security-reviewers.md
+              - "11. Build an Internal Review Program": topics/security-code-review/11-building-an-internal-review-program.md
+          - "Conclusion - Build Defensible Confidence": topics/security-code-review/conclusion-from-uncertainty-to-defensible-confidence.md
+          - "Reference - Secure Coding in Practice": topics/security-code-review/secure-coding-in-practice.md
   - Security musings:
       - Browse: security-musings/index.md
       - "... | flat | glob=security-musings/**/*.md"
