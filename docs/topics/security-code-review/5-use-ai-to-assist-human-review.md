@@ -9,11 +9,13 @@ keywords:
 description: A chapter on practical human-in-the-loop workflows where AI helps security reviewers move faster without replacing judgment.
 ---
 
-## Chapter 7 - Use AI to Assist Human Review
+## Chapter 5 - Use AI to Assist Human Review
 
 The most practical use of AI in security review is not full replacement.
 
 It is assistance.
+
+The methodology you used earlier still sets the rails. Artificial intelligence scales best when you point it at a subsystem boundary, sensitive interfaces, and the control questions you chose during decomposition and threat framing (Chapter 3). Prompt the model so it summarizes intent, proposes abuse paths relevant to those boundaries, and stops before declaring risk without code evidence—the verification standard you sharpened against concrete controls in Chapter 4.
 
 AI can summarize code, generate review questions, trace possible data flows, explain unfamiliar frameworks, draft findings, and suggest tests. The human reviewer still decides whether the issue is real, exploitable, and worth fixing.
 
@@ -79,12 +81,12 @@ The human role is to turn AI output into defensible security judgment.
 
 A simple AI-assisted review workflow looks like this:
 
-1. Ask AI to summarize the change.
-2. Ask AI to identify security-sensitive files and trust boundaries.
-3. Ask AI to generate attack hypotheses.
+1. Name the subsystem and trust boundary touched by the change (tie back to decomposition).
+2. Ask AI to summarize the change and sensitive entry points inside that framing.
+3. Ask AI for attack hypotheses anchored to attacker-controlled inputs and sinks.
 4. Manually verify the highest-risk hypotheses.
-5. Ask AI to suggest abuse-case tests, then review and edit them.
-6. Ask AI to draft the finding, then rewrite it with verified evidence.
+5. Ask AI for abuse-case tests, then tighten them against real behavior.
+6. Ask AI to draft the finding, then rewrite every claim with cited code evidence.
 
 This workflow keeps AI useful but bounded.
 

@@ -9,13 +9,15 @@ keywords:
 description: A chapter on the limits of AI-assisted security review and why human verification remains necessary.
 ---
 
-## Chapter 9 - Control the Risks of AI Review
+## Chapter 7 - Control the Risks of AI Review
 
 AI can make security review faster. It can also make mistakes faster.
 
 The risk is not only that AI misses vulnerabilities. The risk is that it produces confident explanations that look correct enough to trust. Security review cannot depend on confidence alone. It needs evidence.
 
 This chapter explains where AI review commonly fails and how reviewers should control the risk.
+
+Operational guardrails reinforce the methodology: forbid autonomous agents from approving their own alterations or initiating deploys without human escalation, scrutinize prompts that include secrets or regulated data, and insist that high-risk merges still pass human scrutiny even when a model praises the patch.
 
 ## Control Hallucination and Overconfidence
 
@@ -96,4 +98,6 @@ AI security review is useful, but it is not self-validating.
 The reviewer must control hallucination, missing context, unsafe fixes, prompt injection, privacy exposure, and governance risk.
 
 The safest rule is simple: AI can propose. Evidence decides.
+
+Training and programmatic ownership still carry that rule into everyday work; the following two chapters explain how.
 

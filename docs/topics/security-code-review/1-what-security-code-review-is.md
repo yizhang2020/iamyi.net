@@ -13,7 +13,7 @@ description: A short introduction to security code review as a deeper form of co
 
 Security code review is code review with an attacker in mind.
 
-General code review is a checkpoint for quality, maintainability, and shared understanding. Security code review keeps that foundation. It still asks whether the code is understandable and aligned with intent. Then it asks a harder question: what happens if the input, user, or environment is hostile?
+General code review is a checkpoint for functionality, system quality, and shared understanding. Security code review keeps that foundation. It still asks whether the code is understandable and aligned with intent. Then it asks a harder question: what happens if the input, user, or environment is hostile? While functional code review focus on intended functionality, the security code review focus on unintended consiquence.
 
 This is what makes security review different. It does not only ask whether the feature works. It asks whether the feature can be abused.
 
@@ -96,7 +96,7 @@ The safer pattern uses output encoding:
 </div>
 ```
 
-The security issue is not that the page displays the wrong value. The issue is that it displays the value in the wrong trust context.
+The security issue is not that the page displays the wrong **value**. The issue is that it displays the value in the wrong **trust context**.
 
 ## Reduce Risk Instead of Only Finding Bugs
 

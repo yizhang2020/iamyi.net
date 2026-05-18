@@ -9,11 +9,13 @@ keywords:
 description: A chapter on how large language models can support fully automated security review and where such systems need guardrails.
 ---
 
-## Chapter 8 - Run Fully Automated LLM Review
+## Chapter 6 - Run Fully Automated LLM Review
 
 Large language models changed what automated review can attempt.
 
 Traditional scanners are rule-driven. They look for patterns, data flows, unsafe APIs, and known vulnerable dependencies. LLM-based review can reason over names, comments, surrounding code, intent, and natural language context. That makes it useful for semantic review. It also makes it risky, because the model may sound confident when its reasoning is incomplete.
+
+Research findings cluster on two points you should bake into pipelines: repositories are too large for naïve end-to-end model judgment without retrieval, and the strongest pattern is hybrid—deterministic signals first with large language models for triage, explanation, and patching suggestions. Automated review should codify those layers so every run mirrors the decomposition and evidence standards you enforced by hand earlier.
 
 Fully automated LLM review should be treated as an analysis pipeline, not as an unquestioned authority.
 
@@ -73,15 +75,18 @@ LLMs should not work alone.
 
 A better automated pipeline combines:
 
+- Interactive development and pull request assistants with concise security guidance encoded in reusable instructions
 - SAST findings
 - Dependency scan results
 - Secret scan results
 - Test coverage
 - Code search and repository retrieval
-- Threat model context
+- Threat model or subsystem summaries that reflect your methodology
 - LLM reasoning
 
 The model can explain and prioritize tool output. It can also suggest missing cases that rule-based tools did not catch. But scanner evidence and code references should anchor the answer.
+
+Treat large language model output as advisory until you measure precision or recall against real merges. Combine it with merges gated on deterministic continuous integration checks—not on comment threads alone—and keep nightly or periodic full-repository scans feeding refreshed rules whenever the same classes of findings recur.
 
 This reduces hallucination and makes the review more repeatable.
 

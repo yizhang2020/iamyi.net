@@ -89,18 +89,17 @@ nav:
           - "Part I - Build the Reviewer Mindset":
               - "1. Define Security Code Review": topics/security-code-review/1-what-security-code-review-is.md
               - "2. Think Like a Security Reviewer": topics/security-code-review/2-how-to-think-like-a-security-reviewer.md
-          - "Part II - Practice Manual Security Code Review":
-              - "3. Review Code Manually": topics/security-code-review/3-manual-security-code-review-methodology.md
-              - "4. Tracing Data From Source to Sink": topics/security-code-review/4-tracing-data-from-source-to-sink.md
-              - "5. Review Business Logic and Authorization": topics/security-code-review/5-reviewing-business-logic-and-authorization.md
-              - "6. Review Code-Level Vulnerabilities": topics/security-code-review/6-reviewing-code-level-vulnerabilities.md
-          - "Part III - Use AI in Security Code Review":
-              - "7. Use AI to Assist Human Review": topics/security-code-review/7-ai-assisted-human-review-workflow.md
-              - "8. Run Fully Automated LLM Review": topics/security-code-review/8-fully-automated-llm-review.md
-              - "9. Control the Risks of AI Review": topics/security-code-review/9-risks-and-limits-of-ai-security-review.md
-          - "Part IV - Scale Review Skill":
-              - "10. Train Security Reviewers": topics/security-code-review/10-training-security-reviewers.md
-              - "11. Build an Internal Review Program": topics/security-code-review/11-building-an-internal-review-program.md
+          - "Part II - Apply Security Review Methodology":
+              - "3. System Decomposition Methodology": topics/security-code-review/3-system-decomposition-methodology.md
+          - "Part III - Review Code-Level Vulnerabilities":
+              - "4. Review Code-Level Vulnerabilities": topics/security-code-review/4-review-code-level-vulnerabilities.md
+          - "Part IV - Scale With AI Assistance":
+              - "5. Use AI to Assist Human Review": topics/security-code-review/5-use-ai-to-assist-human-review.md
+              - "6. Run Fully Automated LLM Review": topics/security-code-review/6-run-fully-automated-llm-review.md
+              - "7. Control the Risks of AI Review": topics/security-code-review/7-control-the-risks-of-ai-review.md
+          - "Part V - Grow Capability and Governance":
+              - "8. Train Security Reviewers": topics/security-code-review/8-train-security-reviewers.md
+              - "9. Build an Internal Review Program": topics/security-code-review/9-build-an-internal-review-program.md
           - "Conclusion - Build Defensible Confidence": topics/security-code-review/conclusion-from-uncertainty-to-defensible-confidence.md
           - "Reference - Secure Coding in Practice": topics/security-code-review/secure-coding-in-practice.md
   - Security musings:

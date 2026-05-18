@@ -7,7 +7,7 @@ keywords:
 description: Personal notes and articles about reviewing code for security issues.
 ---
 
-## Security Code Review
+## Security Code Review (WIP)
 
 Use this topic as a practical guide to security code review, with a focus on manual review skill and AI-assisted review.
 
@@ -24,29 +24,34 @@ This part helps you build the basic reviewer mindset. You will learn how securit
 - [1. Define Security Code Review](1-what-security-code-review-is.md)
 - [2. Think Like a Security Reviewer](2-how-to-think-like-a-security-reviewer.md)
 
-## Part II - Practice Manual Security Code Review
+## Part II - Apply Security Review Methodology
 
-This part helps you practice manual review on real security questions. You will learn how to trace data, inspect business logic, verify authorization, and review code-level vulnerabilities.
+This part helps you break a system into reviewable subsystems. You will use business logic, authentication, authorization, and data-flow tracing to define boundaries and prepare for code-level review.
 
-- [3. Review Code Manually](3-manual-security-code-review-methodology.md)
-- [4. Tracing Data From Source to Sink](4-tracing-data-from-source-to-sink.md)
-- [5. Review Business Logic and Authorization](5-reviewing-business-logic-and-authorization.md)
-- [6. Review Code-Level Vulnerabilities](6-reviewing-code-level-vulnerabilities.md)
+- [3. System Decomposition Methodology](3-system-decomposition-methodology.md)
 
-## Part III - Use AI in Security Code Review
+## Part III - Review Code-Level Vulnerabilities
 
-This part helps you use AI as a review assistant without giving up judgment. You will see how AI can summarize changes, generate hypotheses, draft findings, and where human verification remains necessary.
+This part takes the methodology down to the final implementation layer. You will review concrete vulnerability patterns and verify security controls in classes, methods, and lines of code.
 
-- [7. Use AI to Assist Human Review](7-ai-assisted-human-review-workflow.md)
-- [8. Run Fully Automated LLM Review](8-fully-automated-llm-review.md)
-- [9. Control the Risks of AI Review](9-risks-and-limits-of-ai-security-review.md)
+- [4. Review Code-Level Vulnerabilities](4-review-code-level-vulnerabilities.md)
 
-## Part IV - Scale Review Skill
+## Part IV - Scale With AI Assistance
 
-This part helps you turn individual review skill into repeatable team practice. It covers reviewer training, internal review programs, ownership, governance, and scalable workflows.
+This part scales what you practiced in Parts II and III—decomposition, tracing, authorization discipline, then code-level controls—rather than swapping that order for brittle prompt magic. Artificial intelligence amplifies reviewers when tasks are constrained: summarized context, structured attack hypotheses, and evidence checks against concrete sources, sinks, and policies. Teams still need deterministic gates, calibrated trust in model output, and explicit governance so tooling does not outrun judgment.
 
-- [10. Train Security Reviewers](10-training-security-reviewers.md)
-- [11. Build an Internal Review Program](11-building-an-internal-review-program.md)
+You can go deeper on research trends and a typical hybrid toolchain in [Security Code Review Trends and Practices in the AI Era](../../security-musings/security-code-review-trend-and-practice-in-ai-era.md).
+
+- [5. Use AI to Assist Human Review](5-use-ai-to-assist-human-review.md)
+- [6. Run Fully Automated LLM Review](6-run-fully-automated-llm-review.md)
+- [7. Control the Risks of AI Review](7-control-the-risks-of-ai-review.md)
+
+## Part V - Grow Capability and Governance
+
+This part turns individual practice into sustained capability and clear ownership across the organization. Training gives reviewers repeatable habits that match Parts II–IV; the internal program aligns schedules, tooling, escalation, and risk acceptance, so review depth matches real risk—not heroics.
+
+- [8. Train Security Reviewers](8-train-security-reviewers.md)
+- [9. Build an Internal Review Program](9-build-an-internal-review-program.md)
 
 ## Conclusion
 

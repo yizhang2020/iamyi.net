@@ -9,7 +9,9 @@ keywords:
 description: A chapter on turning security code review practices into a lightweight, repeatable internal program.
 ---
 
-## Chapter 11 - Build an Internal Review Program
+## Chapter 9 - Build an Internal Review Program
+
+Chapter 8 focused on developing reviewers. This chapter lays out ownership, pacing, reusable artifacts, automation, artificial-intelligence posture, and metrics—so the organization sustains Part V without losing what Parts II–IV require.
 
 A security review program turns individual skill into repeatable practice.
 
@@ -51,11 +53,12 @@ These artifacts reduce repeated explanation. They also make review more consiste
 
 The program should combine automated tools, AI assistance, and human review.
 
-Automation handles repeatable checks: SAST, dependency scanning, secret scanning, container scanning, and CI/CD policy gates.
+A practical standardized stack mirrors what mature teams describe for the AI-assisted era:
 
-AI helps with summarization, review planning, threat hypotheses, finding drafts, test suggestions, and training content.
-
-Human reviewers handle context, exploitability, ownership, and risk acceptance.
+- Maintain interactive assistant coverage in the Integrated Development Environment and pull-request review with short reusable security prompts or rule packs instead of reinventing wording per review.
+- Enforce merges with deterministic scanners for static analysis, secrets, software composition analysis, infrastructure-as-code posture, plus other policy gates tailored to your risk profile.
+- Keep large language models in assistant roles for summarization, triage, hypothetical attacks, remediation drafts, and teaching artifacts while humans adjudicate exploits, approvals, ownership, and risk acceptance.
+- Run periodic broader repository scans, feed recurring findings back into scanners, prompts, templates, or training curricula, and block automated agents from self-approving or self-deploying their output.
 
 This division of labor is important. It lets the program scale without pretending that any one control is enough.
 

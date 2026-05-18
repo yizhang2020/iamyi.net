@@ -41,7 +41,7 @@ This is the discipline behind security code review.
 
 Modern review needs human judgment, AI assistance, and tool-based checks working together.
 
-Human reasoning understands intent, ownership, business rules, and exploitability. AI helps summarize, hypothesize, explain, and accelerate review.
+Human reasoning understands intent, ownership, business rules, and exploitability. AI helps summarize, hypothesize, explain, and accelerate review when it inherits the decomposition and tracing discipline this book insists on—not when it substitutes for methodology.
 
 Each one has limits.
 

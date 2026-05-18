@@ -10,11 +10,11 @@ keywords:
 description: A practical guide to reviewing code-level security flaws, from input handling and injection to parser boundaries, sessions, logging, and dangerous functions.
 ---
 
-## Chapter 6 - Review Code-Level Vulnerabilities
+## Chapter 4 - Review Code-Level Vulnerabilities
 
-Code-level security analysis is where review meets implementation.
+Code-level security analysis is the final layer of the methodology.
 
-The previous chapter focused on business logic and workflow abuse. This chapter moves closer to the code. The reviewer now asks how individual variables, functions, libraries, parsers, and framework calls can turn attacker-controlled input into security impact.
+The methodology chapter defined structure, modeled subsystem threats, traced data, and checked business logic. This part moves into the code that implements the security controls. The reviewer now asks how individual variables, functions, libraries, parsers, and framework calls can turn attacker-controlled input into security impact.
 
 This chapter is heavier than earlier chapters because code-level review covers many vulnerability families. The goal is not to memorize every bug. The goal is to learn a repeatable pattern: trace the data, identify the trust boundary, find the unsafe assumption, and verify the control.
 
@@ -399,5 +399,5 @@ Code-level security analysis is not random pattern matching.
 
 It is a structured review of how data moves through code and what happens when that data is hostile. The reviewer traces sources to sinks, checks validation and encoding, inspects parser and file boundaries, verifies session and token handling, and treats logging, errors, crypto, and dangerous functions as security-sensitive code.
 
-The next chapter moves from manual review skill to AI-assisted review workflows.
+The next part explains how AI can help scale the same review methodology.
 
