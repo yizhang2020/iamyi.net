@@ -10,13 +10,13 @@ description: A chapter on building security reviewer skill through progressive l
 
 ## Chapter 8 - Train Security Reviewers
 
-Part IV described how assistants and pipelines extend the reviewer. Part V addresses the people-and-process layer: cultivating judgment at scale.
+Part VI described how assistants and pipelines extend the reviewer. Part VII addresses the people-and-process layer: cultivating judgment at scale.
 
 Security code review is a skill.
 
 It improves through structured learning, repeated practice, feedback, and exposure to real code. A reviewer does not become effective by memorizing a checklist. The reviewer must learn how vulnerabilities appear in implementation, how attackers think, and how to explain risk clearly.
 
-Training should reinforce the decomposition workflow reviewed in Parts II–III—naming subsystem intent, honoring trust boundaries before opening files—the evidence habits from Chapter 4, and the prompting and governance expectations from Part IV. Measuring trainee performance therefore includes whether they demanded evidence whenever a tool or model voiced confidence.
+Training should reinforce the decomposition workflow reviewed in Parts II–III—naming subsystem intent, honoring trust boundaries before opening files—the evidence habits from Chapter 4, implementation and configuration review from Parts IV–V, and the prompting and governance expectations from Part VI. Measuring trainee performance therefore includes whether they demanded evidence whenever a tool or model voiced confidence.
 
 Training should build this skill step by step.
 

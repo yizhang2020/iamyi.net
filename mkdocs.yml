@@ -92,12 +92,78 @@ nav:
           - "Part II - Apply Security Review Methodology":
               - "3. System Decomposition Methodology": topics/security-code-review/3-system-decomposition-methodology.md
           - "Part III - Review Code-Level Vulnerabilities":
-              - "4. Review Code-Level Vulnerabilities": topics/security-code-review/4-review-code-level-vulnerabilities.md
-          - "Part IV - Scale With AI Assistance":
+              - "4. Review Code-Level Vulnerabilities (overview)": topics/security-code-review/4-review-code-level-vulnerabilities.md
+              - "Input, injection, and parsing":
+                  - "4.1 Review Stored XSS": topics/security-code-review/4-01-review-stored-xss.md
+                  - "4.2 Review Reflected XSS": topics/security-code-review/4-02-review-reflected-xss.md
+                  - "4.3 Review SQL Injection": topics/security-code-review/4-03-review-sql-injection.md
+                  - "4.4 Review Command Injection": topics/security-code-review/4-04-review-command-injection.md
+                  - "4.5 Review Code Injection": topics/security-code-review/4-05-review-code-injection.md
+                  - "4.6 Review JSON Injection": topics/security-code-review/4-06-review-json-injection.md
+                  - "4.7 Review Dynamic JSP Inclusion": topics/security-code-review/4-07-review-dynamic-jsp-inclusion.md
+                  - "4.8 Review XXE": topics/security-code-review/4-08-review-xxe.md
+                  - "4.9 Review SSTI": topics/security-code-review/4-09-review-ssti.md
+                  - "4.10 Review Path Traversal": topics/security-code-review/4-10-review-path-traversal.md
+                  - "4.11 Review Client-Side Validation": topics/security-code-review/4-11-review-client-side-validation.md
+              - "Cryptography":
+                  - "4.12 Review Cryptographic Implementation": topics/security-code-review/4-12-review-cryptographic-implementation.md
+              - "Sessions and access control":
+                  - "4.13 Review CSRF": topics/security-code-review/4-13-review-csrf.md
+                  - "4.14 Review SSRF": topics/security-code-review/4-14-review-ssrf.md
+                  - "4.15 Review Broken Session Management": topics/security-code-review/4-15-review-broken-session-management.md
+                  - "4.16 Review JWT Security": topics/security-code-review/4-16-review-jwt-security.md
+                  - "4.17 Review Authentication and Authorization": topics/security-code-review/4-17-review-authentication-and-authorization.md
+                  - "4.18 Review Broken Password Lifecycle": topics/security-code-review/4-18-review-broken-password-lifecycle.md
+                  - "4.19 Review Forced Browsing": topics/security-code-review/4-19-review-forced-browsing.md
+                  - "4.20 Review IDOR": topics/security-code-review/4-20-review-idor.md
+              - "Information disclosure":
+                  - "4.21 Review Error Page Disclosure": topics/security-code-review/4-21-review-error-page-disclosure.md
+                  - "4.22 Review Sensitive Data in URL": topics/security-code-review/4-22-review-sensitive-data-in-url.md
+                  - "4.23 Review Username Enumeration": topics/security-code-review/4-23-review-username-enumeration.md
+                  - "4.24 Review Internal and Egress Exfiltration": topics/security-code-review/4-24-review-internal-and-egress-exfiltration.md
+                  - "4.25 Review Sensitive Logging": topics/security-code-review/4-25-review-sensitive-logging.md
+              - "File handling":
+                  - "4.26 Review Insecure Temporary Files": topics/security-code-review/4-26-review-insecure-temporary-files.md
+                  - "4.27 Review Insecure File Parsing": topics/security-code-review/4-27-review-insecure-file-parsing.md
+                  - "4.28 Review Insecure File Path Handling": topics/security-code-review/4-28-review-insecure-file-path-handling.md
+                  - "4.29 Review Insecure File Upload": topics/security-code-review/4-29-review-insecure-file-upload.md
+              - "Framework and insecure practices":
+                  - "4.41 Review Insecure Coding Practice": topics/security-code-review/4-41-review-insecure-coding-practice.md
+                  - "4.30 Review Framework Secure Defaults": topics/security-code-review/4-30-review-framework-secure-defaults.md
+                  - "4.31 Review Sensitive Code Comments": topics/security-code-review/4-31-review-sensitive-code-comments.md
+                  - "4.32 Review Hardcoded Secrets": topics/security-code-review/4-32-review-hardcoded-secrets.md
+                  - "4.33 Review Insecure Cookie Configuration": topics/security-code-review/4-33-review-insecure-cookie-configuration.md
+                  - "4.34 Review Obsolete Code": topics/security-code-review/4-34-review-obsolete-code.md
+                  - "4.35 Review Dangerous Functions": topics/security-code-review/4-35-review-dangerous-functions.md
+                  - "4.36 Review Non-Standard Crypto Practices": topics/security-code-review/4-36-review-non-standard-crypto-practices.md
+                  - "4.37 Review Insecure Deserialization": topics/security-code-review/4-37-review-insecure-deserialization.md
+                  - "4.38 Review Encryption and Decryption Mistakes": topics/security-code-review/4-38-review-encryption-decryption-mistakes.md
+              - "Logging and supply chain":
+                  - "4.39 Review Secure Logging": topics/security-code-review/4-39-review-secure-logging.md
+                  - "4.40 Review Software Supply Chain": topics/security-code-review/4-40-review-software-supply-chain.md
+          - "Part IV - Review Secure Implementations":
+              - "10. Review Secure Implementations (overview)": topics/security-code-review/10-review-secure-implementations.md
+              - "Identity and federation":
+                  - "10.1 Review OAuth 2.0 Implementation": topics/security-code-review/10-01-review-oauth-implementation.md
+                  - "10.2 Review OpenID Connect Implementation": topics/security-code-review/10-02-review-oidc-implementation.md
+                  - "10.3 Review JWT Implementation": topics/security-code-review/10-03-review-jwt-implementation.md
+                  - "10.4 Review SAML Federation": topics/security-code-review/10-04-review-saml-federation.md
+              - "Transport and API trust":
+                  - "10.5 Review TLS and SSL Protocol": topics/security-code-review/10-05-review-tls-ssl-protocol.md
+                  - "10.6 Review mTLS and Service Identity": topics/security-code-review/10-06-review-mtls-service-identity.md
+                  - "10.7 Review API Keys and Request Signing": topics/security-code-review/10-07-review-api-keys-and-request-signing.md
+          - "Part V - Review Secure Configuration":
+              - "11. Review Secure Configuration (overview)": topics/security-code-review/11-review-secure-configuration.md
+              - "11.1 Review Snowflake Security Configuration": topics/security-code-review/11-01-review-snowflake-security-configuration.md
+              - "11.2 Review Databricks Clean Room Configuration": topics/security-code-review/11-02-review-databricks-clean-room-configuration.md
+              - "11.3 Review AWS IAM and Secrets Configuration": topics/security-code-review/11-03-review-aws-iam-and-secrets-configuration.md
+              - "11.4 Review Kubernetes Security Configuration": topics/security-code-review/11-04-review-kubernetes-security-configuration.md
+              - "11.5 Review PostgreSQL Security Configuration": topics/security-code-review/11-05-review-postgresql-security-configuration.md
+          - "Part VI - Scale With AI Assistance":
               - "5. Use AI to Assist Human Review": topics/security-code-review/5-use-ai-to-assist-human-review.md
               - "6. Run Fully Automated LLM Review": topics/security-code-review/6-run-fully-automated-llm-review.md
               - "7. Control the Risks of AI Review": topics/security-code-review/7-control-the-risks-of-ai-review.md
-          - "Part V - Grow Capability and Governance":
+          - "Part VII - Grow Capability and Governance":
               - "8. Train Security Reviewers": topics/security-code-review/8-train-security-reviewers.md
               - "9. Build an Internal Review Program": topics/security-code-review/9-build-an-internal-review-program.md
           - "Conclusion - Build Defensible Confidence": topics/security-code-review/conclusion-from-uncertainty-to-defensible-confidence.md

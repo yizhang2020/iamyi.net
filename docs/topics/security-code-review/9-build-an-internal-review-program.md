@@ -11,7 +11,7 @@ description: A chapter on turning security code review practices into a lightwei
 
 ## Chapter 9 - Build an Internal Review Program
 
-Chapter 8 focused on developing reviewers. This chapter lays out ownership, pacing, reusable artifacts, automation, artificial-intelligence posture, and metrics—so the organization sustains Part V without losing what Parts II–IV require.
+Chapter 8 focused on developing reviewers. This chapter lays out ownership, pacing, reusable artifacts, automation, artificial-intelligence posture, and metrics—so the organization sustains Part VII without losing what Parts II–VI require.
 
 A security review program turns individual skill into repeatable practice.
 

@@ -7,7 +7,7 @@ keywords:
   - path traversal
   - deserialization
   - code-level analysis
-description: A practical guide to reviewing code-level security flaws, from input handling and injection to parser boundaries, sessions, logging, and dangerous functions.
+description: Overview of code-level security review and an index of focused mini-chapters for each vulnerability family.
 ---
 
 ## Chapter 4 - Review Code-Level Vulnerabilities
@@ -16,388 +16,105 @@ Code-level security analysis is the final layer of the methodology.
 
 The methodology chapter defined structure, modeled subsystem threats, traced data, and checked business logic. This part moves into the code that implements the security controls. The reviewer now asks how individual variables, functions, libraries, parsers, and framework calls can turn attacker-controlled input into security impact.
 
-This chapter is heavier than earlier chapters because code-level review covers many vulnerability families. The goal is not to memorize every bug. The goal is to learn a repeatable pattern: trace the data, identify the trust boundary, find the unsafe assumption, and verify the control.
+The goal is not to memorize every bug class. The goal is to learn a repeatable pattern: trace the data, identify the trust boundary, find the unsafe assumption, and verify the control.
 
-## Start With Data Flow
+## How to Use the Mini-Chapters
 
-Most code-level findings start with data flow.
+Each vulnerability family below has its own standalone chapter. Every mini-chapter follows the same teaching pattern:
 
-A reviewer should ask where the data comes from, what code transforms it, and where it is used. The most important question is whether the data is attacker-controlled.
+1. **What the flaw is** — definition and CWE mapping where applicable.
+2. **Vulnerability characteristics** — where the pattern appears in real codebases (features, sinks, weak controls).
+3. **Sample vulnerable code in Python** — one focused example to study first.
+4. **Step-by-step review walkthrough** — how to trace the flaw and why each step matters.
+5. **Risk impact analysis** — what can go wrong for users, data, and the business.
+6. **Vulnerable examples in other languages** — always **Java** and **C#** first; then, when applicable, **JavaScript**, **HTML**, and **Go**; then **SQL**, **Shell**, and **C**. The **Sample Vulnerable Code** section always uses **Python** for the primary walkthrough.
+7. **Fix: safer patterns and libraries** — real code using vetted APIs, with **Important** notes per language.
+8. **Verify during review** — evidence to collect before you file a finding.
+9. **Reference** — official documentation links for the libraries and standards cited in the fix section.
 
-Attacker-controlled input can come from HTTP parameters, headers, cookies, request bodies, uploaded files, JSON fields, URLs, templates, environment-influenced configuration, or messages from another service.
+The archive article [Secure Coding in Practice](secure-coding-in-practice.md) remains available as background reading; mini-chapters do not link to it in their reference sections.
 
-Once the reviewer finds the input, the next question is the sink. A sink is where data becomes meaningful or dangerous. Examples include SQL queries, HTML output, file paths, shell commands, template rendering, XML parsing, object deserialization, logging, and outbound requests.
+## Input Validation, Injection, and Parsing
 
-Code-level review is the path between source and sink.
+- [4.1 Review Stored XSS](4-01-review-stored-xss.md)
+- [4.2 Review Reflected XSS](4-02-review-reflected-xss.md)
+- [4.3 Review SQL Injection](4-03-review-sql-injection.md)
+- [4.4 Review Command Injection](4-04-review-command-injection.md)
+- [4.5 Review Code Injection](4-05-review-code-injection.md)
+- [4.6 Review JSON Injection](4-06-review-json-injection.md)
+- [4.7 Review Dynamic JSP Inclusion](4-07-review-dynamic-jsp-inclusion.md)
+- [4.8 Review XXE](4-08-review-xxe.md)
+- [4.9 Review SSTI](4-09-review-ssti.md)
+- [4.10 Review Path Traversal](4-10-review-path-traversal.md)
+- [4.11 Review Client-Side Validation](4-11-review-client-side-validation.md)
 
-## Separate Input Validation From Output Encoding
+## Cryptography
 
-Input validation and output encoding solve different problems.
+- [4.12 Review Cryptographic Implementation](4-12-review-cryptographic-implementation.md)
 
-Input validation checks whether data is acceptable for the application. Output encoding makes data safe for a specific output context, such as HTML.
+## Sessions, Requests, and Access Control
 
-Stored and reflected XSS show the difference. The application may retrieve a username and place it into the request:
+- [4.13 Review CSRF](4-13-review-csrf.md)
+- [4.14 Review SSRF](4-14-review-ssrf.md)
+- [4.15 Review Broken Session Management](4-15-review-broken-session-management.md)
+- [4.16 Review JWT Security](4-16-review-jwt-security.md)
+- [4.17 Review Authentication and Authorization](4-17-review-authentication-and-authorization.md)
+- [4.18 Review Broken Password Lifecycle](4-18-review-broken-password-lifecycle.md)
+- [4.19 Review Forced Browsing](4-19-review-forced-browsing.md)
+- [4.20 Review IDOR](4-20-review-idor.md)
 
-```java
-@Override
-protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-    User user = databaseManager.getUserFromId(request.getParameter("id"));
-    request.setAttribute("user", user.getUsername());
-    doForward(request, response);
-}
-```
+## Information Disclosure
 
-If the JSP renders that value directly, the browser may treat attacker-controlled text as markup:
+- [4.21 Review Error Page Disclosure](4-21-review-error-page-disclosure.md)
+- [4.22 Review Sensitive Data in URL](4-22-review-sensitive-data-in-url.md)
+- [4.23 Review Username Enumeration](4-23-review-username-enumeration.md)
+- [4.24 Review Internal and Egress Exfiltration](4-24-review-internal-and-egress-exfiltration.md)
+- [4.25 Review Sensitive Logging](4-25-review-sensitive-logging.md)
 
-```html
-<div id="hello-message">
-    <p>Hello user <%=request.getAttribute("user")%>. Welcome to the platform!</p>
-</div>
-```
+## File and Path Handling
 
-The safer pattern encodes output for the HTML context:
+- [4.26 Review Insecure Temporary Files](4-26-review-insecure-temporary-files.md)
+- [4.27 Review Insecure File Parsing](4-27-review-insecure-file-parsing.md)
+- [4.28 Review Insecure File Path Handling](4-28-review-insecure-file-path-handling.md)
+- [4.29 Review Insecure File Upload](4-29-review-insecure-file-upload.md)
 
-```jsp
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<div id="hello-message">
-    <p>Hello user <c:out value="${requestScope.user}" />. Welcome to the platform!</p>
-</div>
-```
+## Framework and Configuration
 
-Client-side validation can still be useful:
+- [4.30 Review Framework Secure Defaults](4-30-review-framework-secure-defaults.md)
 
-```html
-<input type="text" id="username" name="username" pattern="[a-zA-Z0-9]{4,20}" required>
-```
+## Insecure Coding Practices
 
-But client-side validation is not a server-side security control. A reviewer should ask whether the server validates the input and whether the output is encoded for the correct context.
+- [4.41 Review Insecure Coding Practice](4-41-review-insecure-coding-practice.md) — TLS verification, JWT signature/key handling, cookie flags, and related habits
+- [4.31 Review Sensitive Code Comments](4-31-review-sensitive-code-comments.md)
+- [4.32 Review Hardcoded Secrets](4-32-review-hardcoded-secrets.md)
+- [4.33 Review Insecure Cookie Configuration](4-33-review-insecure-cookie-configuration.md)
+- [4.34 Review Obsolete Code](4-34-review-obsolete-code.md)
+- [4.35 Review Dangerous Functions](4-35-review-dangerous-functions.md)
+- [4.36 Review Non-Standard Crypto Practices](4-36-review-non-standard-crypto-practices.md)
+- [4.37 Review Insecure Deserialization](4-37-review-insecure-deserialization.md)
+- [4.38 Review Encryption and Decryption Mistakes](4-38-review-encryption-decryption-mistakes.md)
 
-## Review Injection Paths
+## Logging and Supply Chain
 
-Injection happens when data changes the meaning of an instruction.
+- [4.39 Review Secure Logging](4-39-review-secure-logging.md)
+- [4.40 Review Software Supply Chain](4-40-review-software-supply-chain.md)
 
-SQL injection is the classic example:
+## Core Review Habits
 
-```sql
-sql = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'"
-```
+Most code-level findings still start with data flow:
 
-The issue is not only string concatenation. The issue is that `username` and `password` can become part of the SQL structure. The secure pattern separates query structure from values:
+- Where does the data come from?
+- What code transforms it?
+- Where is it used (the sink)?
+- Is the data attacker-controlled?
 
-```java
-String query = "SELECT * FROM User WHERE username = ? AND password = ?";
+Separate **input validation** from **output encoding**. Validation decides whether data is acceptable for the application. Encoding makes data safe for a specific output context (HTML, SQL, shell, URL).
 
-PreparedStatement statement = connection.prepareStatement(query);
-statement.setString(1, username);
-statement.setString(2, passwordHash);
+When you finish a mini-chapter, record source, sink, missing control, impact, and a test that proves the fix.
 
-resultSet = statement.executeQuery();
-```
+## Next: Secure Implementations and Configuration
 
-Command injection follows the same idea in a different sink:
+After code-level patterns, continue with:
 
-```java
-String[] cmd = { "/bin/sh", "-c", 'ping '+hostname };
-Process p = Runtime.getRuntime().exec(cmd);
-```
-
-The reviewer should ask whether `hostname` is attacker-controlled. If it is, the code may let the attacker extend the command. The safer review direction is to avoid shell execution when possible. If an external command is required, use strict allowlists and safe process APIs.
-
-Code injection is even more direct:
-
-```java
-ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
-String expression = "Math.pow(" + x + ",2)" + "+" + y;
-engine.eval(expression);
-```
-
-Here, the sink is an interpreter. A reviewer should be skeptical whenever user-controlled data reaches `eval`, a scripting engine, dynamic template evaluation, or reflection-based execution.
-
-## Check JSON and Template Boundaries
-
-JSON injection and template injection are boundary problems.
-
-JSON often looks like data, but applications may attach meaning to fields, roles, flags, or object structure. If attackers can add or modify fields, they may influence behavior the developer did not intend.
-
-A reviewer should ask:
-
-- Which fields are allowed?
-- Are unknown fields rejected?
-- Is the schema enforced?
-- Are role, price, owner, or permission fields accepted from the client?
-
-Server-side template injection has a different sink. User input reaches a template engine:
-
-```html
-<p th:text="${user_input}"></p>  <!-- Vulnerable if unsanitized -->
-```
-
-In Python, direct template construction can create the same risk:
-
-```python
-template = Template("Hello {{ " + user_input + " }}")  # Vulnerable
-```
-
-Template engines often have access to variables, helpers, or execution features. The reviewer should ask whether user input is treated as content or as template logic.
-
-## Check Parser and Deserialization Boundaries
-
-Parsers turn bytes into structure. That makes them security boundaries.
-
-XML external entity parsing is a clear example:
-
-```xml
-<!DOCTYPE route
-[
-<!ENTITY placeholder SYSTEM "file:///etc/passwd" >
-]>
-```
-
-If external entities are allowed, XML input may cause the parser to read local files or internal resources. The safer configuration disables dangerous XML features:
-
-```java
-DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-
-dbFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-dbFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-dbFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-
-dbFactory.setXIncludeAware(false);
-dbFactory.setExpandEntityReferences(false);
-```
-
-The review question is whether the parser accepts untrusted input and whether dangerous features are disabled.
-
-Deserialization has a related risk. It turns input into objects. The reference material recommends safer formats and standard libraries:
-
-```java
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-
-public class SecureDeserialization {
-    public static void main(String[] args) {
-        String jsonInput = "{ \"name\": \"John\", \"role\": \"admin\" }";
-        Gson gson = new Gson();
-        // ...
-    }
-}
-```
-
-The reviewer should ask whether the input is trusted, whether the type is controlled, whether unknown fields are rejected, and whether dependencies are patched.
-
-## Review File, Path, and Temporary File Handling
-
-File access turns strings into filesystem authority.
-
-Path traversal appears when user input controls a filename or path:
-
-```python
-file = request.args.get('filename')  # User-provided input
-open(f"/var/www/uploads/{file}", "r")  # Potentially vulnerable
-```
-
-The secure pattern normalizes the path and checks that it remains inside the allowed directory:
-
-```python
-from flask import request, abort
-from pathlib import Path
-
-UPLOAD_FOLDER = "/var/www/uploads"
-
-@app.route('/get_file')
-def get_file():
-    filename = request.args.get('file')
-    if not filename:
-        abort(400, "File not specified")
-
-    safe_path = Path(UPLOAD_FOLDER).joinpath(filename).resolve()
-
-    if not str(safe_path).startswith(str(Path(UPLOAD_FOLDER).resolve())):
-        abort(403, "Access Denied")
-    # ...
-```
-
-Temporary files need review too. Predictable names can create race conditions:
-
-```python
-import os
-
-temp_file = f"/tmp/tempfile_{os.getpid()}.txt"  # Predictable filename
-with open(temp_file, "w") as f:
-    f.write("Sensitive data")
-```
-
-The safer pattern uses secure temporary file APIs and deletes the file when finished:
-
-```python
-import tempfile
-import os
-
-with tempfile.NamedTemporaryFile(mode="w+", delete=False) as temp_file:
-    temp_file.write("Sensitive data")
-    temp_file_path = temp_file.name
-
-os.remove(temp_file_path)
-```
-
-The reviewer should check path normalization, base-directory enforcement, permissions, predictable names, cleanup, and time-of-check to time-of-use risk.
-
-## Review Sessions, Tokens, and Authentication Checks
-
-Session and token code should be reviewed at the code level.
-
-The reference material highlights common session risks: predictable session IDs, token exposure, fixation, weak timeouts, missing revocation, missing rotation, XSS, and CSRF.
-
-Secure session code sets protective attributes:
-
-```java
-Cookie sessionCookie = new Cookie("JSESSIONID", session.getId());
-sessionCookie.setHttpOnly(true);   // Prevents JS access
-sessionCookie.setSecure(true);     // HTTPS only
-sessionCookie.setPath("/");        // Limits scope
-```
-
-JWT review also matters. If signature validation is missing or weak, an attacker may spoof token claims:
-
-```java
-Jwts.parser()
-    .setSigningKey("secretkey")
-    .parseClaimsJws(jwtString).getBody();
-```
-
-The reviewer should ask where the signing key comes from, whether the algorithm is fixed, whether expiration is checked, and whether authorization is derived from trusted server-side state.
-
-## Review Request Forgery and Outbound Calls
-
-Request forgery bugs appear when code causes a trusted system to send a request the attacker controls.
-
-CSRF abuses the user's browser and existing session. The reviewer should look for state-changing routes that rely only on cookies and do not require a CSRF token, reauthentication, or another intentional user signal.
-
-SSRF abuses the server. The vulnerable pattern is often an internal request built from user input:
-
-```java
-URL url = new URL("http://127.0.0.1" + endpoint);
-StringBuilder result = new StringBuilder();
-HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-conn.setRequestMethod("GET");
-```
-
-Under normal use, a caller may request `/users/1`. An attacker may try `/secret`, cloud metadata endpoints, localhost-only admin routes, or internal service names.
-
-For SSRF review, denylists are weak. Attackers can bypass simple string checks with redirects, DNS tricks, encoded addresses, alternate IP formats, and internal hostnames. The stronger pattern is an allowlist of known safe destinations and routes.
-
-The reviewer should ask three questions:
-
-1. Can user input control the protocol, host, port, path, or headers?
-2. Can the server reach internal networks that the user cannot reach directly?
-3. Is the destination restricted by an allowlist before the request is sent?
-
-## Review Error Handling and Logging
-
-Error handling can become data exposure.
-
-This pattern sends internal details to the response:
-
-```java
-try {
-   // ...
-} catch(Exception e) {
-   e.printStackTrace(response.getWriter());
-}
-```
-
-The safer direction is to use controlled error pages and server-side logging:
-
-```xml
-<error-page>
-   <location>/error.html</location>
-</error-page>
-```
-
-Logging also needs boundaries. Logs should capture events such as login attempts, authorization failures, input validation failures, administrative activity, and access to sensitive data.
-
-But logs should not contain passwords, session IDs, access tokens, database connection strings, encryption keys, or sensitive personal data. The reviewer should treat logs as a potential data store.
-
-Data exposure also happens through normal application behavior. Passwords and reset tokens should not appear in URLs:
-
-```java
-String email = req.getParameter("email");
-String password = req.getParameter("password");
-```
-
-Username enumeration is another example. If the reset flow says "User does not exist" for one case and "The password reset link has been sent" for another, the application leaks account existence.
-
-The reviewer should check whether external responses reveal more than the user is allowed to know.
-
-## Review Crypto and Dangerous Functions
-
-Cryptographic code should use established libraries and clear purpose.
-
-The source material warns against hardcoded secrets, outdated protocols, custom crypto, and mixing hashing with encryption. Hashing verifies data. Encryption protects confidentiality. They are not interchangeable.
-
-Dangerous functions are review signals:
-
-```text
-eval()
-```
-
-`eval()` is not always a vulnerability by itself. But it tells the reviewer to ask what input can reach it, what language context it executes in, and whether a safer API exists.
-
-The same principle applies to custom parsing, custom encryption, dynamic inclusion, and framework bypasses. Code-level review should become more skeptical when the implementation reinvents a security-sensitive feature.
-
-## Check Framework Defaults and Insecure Leftovers
-
-Frameworks can reduce risk, but only when their secure defaults are enabled.
-
-The source material calls out examples across Django, Flask, Express.js, Rails, Spring Boot, and Laravel. The specific files differ, but the review questions are stable:
-
-- Are secure cookies enabled?
-- Is CSRF protection enabled for browser-facing state changes?
-- Are detailed errors disabled in production?
-- Are input validation and output escaping handled by framework-supported APIs?
-- Are secrets loaded from environment variables or a secret manager?
-- Are dependency versions still supported and patched?
-
-Security review should also look for insecure leftovers.
-
-Comments can expose sensitive operations:
-
-```html
-<!-- TODO: Change the admin password from the weak password 'adminPass' to something stronger! -->
-```
-
-Hardcoded bypasses are worse:
-
-```java
-optionalUser.ifPresent(user -> {
-    if (this.bCryptUtils.checkPasswordHash(password, user.getPassword()) || "byp@33_p@ssw0rd".equals(password)) {
-        HttpSession session = req.getSession();
-        session.invalidate();
-        // ...
-```
-
-Obsolete code, test artifacts, feature flags, and temporary debugging paths often survive longer than expected. A reviewer should ask whether the code is reachable, whether it changes authentication or authorization behavior, and whether it was intended for production.
-
-## Map Findings to Evidence
-
-A code-level finding should produce review evidence.
-
-For each issue, the reviewer should record:
-
-1. What the code is trying to do
-2. What input is attacker-controlled
-3. What trust boundary is crossed
-4. What unsafe assumption exists
-5. What impact is possible
-6. What safer pattern should replace it
-
-Frameworks such as OWASP Top 10, CWE, CAPEC, MITRE ATT&CK, and CERT can help classify the finding. Classification is useful, but it is not the main goal. The main goal is to explain the risk clearly enough that engineers can fix it.
-
-## Key Takeaway
-
-Code-level security analysis is not random pattern matching.
-
-It is a structured review of how data moves through code and what happens when that data is hostile. The reviewer traces sources to sinks, checks validation and encoding, inspects parser and file boundaries, verifies session and token handling, and treats logging, errors, crypto, and dangerous functions as security-sensitive code.
-
-The next part explains how AI can help scale the same review methodology.
-
+- [Chapter 10 - Review Secure Implementations](10-review-secure-implementations.md) — OAuth, OIDC, JWT, SAML, TLS, mTLS, API signing
+- [Chapter 11 - Review Secure Configuration](11-review-secure-configuration.md) — Snowflake, Databricks clean rooms, AWS IAM, Kubernetes, PostgreSQL

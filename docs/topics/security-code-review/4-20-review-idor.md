@@ -1,0 +1,256 @@
+---
+title: Review IDOR
+keywords:
+  - security code review
+  - idor
+  - insecure direct object reference
+  - horizontal privilege escalation
+  - object level authorization
+description: How to read code for insecure direct object references—verify object lookups bind to the authenticated principal's scope.
+---
+
+## 4.20 - Review IDOR
+
+Insecure direct object references (IDOR) appear when the application uses predictable identifiers—numeric IDs, UUIDs in URLs, file names, or invoice numbers—without verifying the caller may access that object. Review edit, download, and API endpoints that take `id`, `userId`, `accountId`, or similar parameters. Confirm the server binds each query to the authenticated principal's scope.
+
+## What This Vulnerability Is
+
+IDOR is horizontal privilege escalation. A user authorized for object A can read or modify object B by changing an identifier in the URL, body, or header. The application performs the database or file operation but never checks ownership, tenant, or role against the target resource.
+
+The unsafe assumption is that opaque or sequential IDs are secret. Attackers enumerate IDs or reuse leaked references from logs and emails. Impact includes exposure of personal data, unauthorized edits, and mass account compromise. This maps to [CWE-639](https://cwe.mitre.org/data/definitions/639.html) (Authorization Bypass Through User-Controlled Key) and [OWASP Broken Access Control](https://owasp.org/www-project-top-ten/).
+
+## Vulnerability Characteristics (Where to Identify Them)
+
+| Signal | Where to look |
+| --- | --- |
+| **Feature type** | Profile edit, invoice download, order detail, file download, message view |
+| **Object selectors** | Path variables, query strings, JSON `id` fields, hidden form inputs |
+| **ID-only lookup** | `findById(userSuppliedId)` with no ownership filter in repository layer |
+| **Client-supplied owner** | Create/update DTOs accepting `userId`, `orgId`, or `accountId` from body |
+| **Batch endpoints** | Arrays of IDs returned without per-item authorization |
+| **File access** | `send_file(userInput)` or bucket keys built from unsanitized names |
+
+## Sample Vulnerable Code in Python
+
+```python
+import os
+from flask import Flask, request, jsonify, send_file, session
+
+app = Flask(__name__)
+
+@app.route("/api/orders/<order_id>")
+def get_order(order_id):
+    if "user_id" not in session:
+        return "", 401
+    # Authenticated but no owner filter — ID swap exposes other users' orders
+    order = db.orders.find_one({"_id": order_id})
+    return jsonify(order)
+
+@app.route("/files")
+def download():
+    name = request.args.get("name")
+    return send_file(os.path.join("/uploads", name))
+```
+
+## Step-by-Step Review Walkthrough
+
+1. **List parameters that select objects.** Path variables, query strings, JSON fields, and hidden form inputs.
+2. **Trace from parameter to persistence.** SQL `WHERE id = ?`, S3 keys, filesystem paths, and cache keys.
+3. **Locate authorization between lookup and response.** Compare resource `ownerId`, `tenantId`, or ACL to current user.
+4. **Review bulk and export endpoints.** Arrays of IDs need per-item checks, not only batch existence.
+5. **Check indirect references.** Download tokens, signed URLs, and GraphQL node IDs that decode to internal keys.
+6. **Inspect create/update flows.** Attackers may set `owner_id` or `role` via mass assignment on create.
+7. **Test UUID assumptions.** Even random IDs need authorization when leaked through shared links or logs.
+
+## Risk Impact Analysis
+
+**Personal data exposure.** Horizontal access to medical, financial, or account records violates privacy expectations and regulations.
+
+**Unauthorized modification.** Attackers change addresses, payment methods, or orders belonging to other users.
+
+**Mass enumeration.** Sequential IDs enable scripted harvesting of records across an entire dataset.
+
+**File system access.** Path-based downloads without ACL checks may expose uploads from other tenants.
+
+**Reputational and legal harm.** IDOR findings often trigger breach notification analysis and customer churn.
+
+## Vulnerable Examples in Other Languages
+
+### Java
+
+```java
+@GetMapping("/user/edit")
+public String editUser(@RequestParam Long id, Model model) {
+    User user = userRepository.findById(id).orElseThrow();
+    model.addAttribute("user", user);
+    return "edit-user";
+}
+
+@GetMapping("/invoices/{invoiceId}/pdf")
+public ResponseEntity<byte[]> downloadPdf(@PathVariable Long invoiceId) {
+    byte[] pdf = invoiceService.render(invoiceId);
+    return ResponseEntity.ok(pdf);
+}
+```
+
+### C#
+
+```csharp
+[HttpGet("accounts/{accountId}")]
+public AccountDto GetAccount(Guid accountId)
+{
+    return _repo.GetAccount(accountId);
+}
+
+[HttpPut("tickets/{ticketId}")]
+public IActionResult UpdateTicket(Guid ticketId, TicketUpdateDto dto)
+{
+    _repo.Update(ticketId, dto);
+    return NoContent();
+}
+```
+
+### Go
+
+```go
+func getMessage(w http.ResponseWriter, r *http.Request) {
+    id := mux.Vars(r)["id"]
+    var body, owner string
+    db.QueryRow("SELECT body, owner FROM messages WHERE id = ?", id).Scan(&body, &owner)
+    fmt.Fprint(w, body)
+}
+
+func updateAddress(w http.ResponseWriter, r *http.Request) {
+    userID := r.FormValue("user_id")
+    addr := r.FormValue("address")
+    db.Exec("UPDATE addresses SET line = ? WHERE user_id = ?", addr, userID)
+}
+```
+
+## Fix: Safer Patterns and Libraries to Use
+
+### Python
+
+Filter every lookup by authenticated owner. Map file access through database metadata.
+
+```python
+@app.route("/api/orders/<order_id>")
+@login_required
+def get_order(order_id):
+    order = db.orders.find_one({
+        "_id": order_id,
+        "user_id": current_user.id,
+    })
+    if not order:
+        abort(404)
+    return jsonify(order)
+
+@app.route("/files/<file_id>")
+@login_required
+def download(file_id):
+    meta = db.files.find_one({"_id": file_id, "owner_id": current_user.id})
+    if not meta:
+        abort(404)
+    return send_file(meta["path"])
+```
+
+```python
+# Django equivalent:
+# Order.objects.get(id=order_id, user=request.user)
+```
+
+**Important:** Exclude `owner_id` from client-writable serializer fields. Use django-guardian for shared resources with per-row permissions.
+
+### Java
+
+Use scoped repository methods and `@PostAuthorize` on service returns.
+
+```java
+@GetMapping("/invoices/{invoiceId}/pdf")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<byte[]> downloadPdf(@PathVariable Long invoiceId,
+                                            @AuthenticationPrincipal User user) {
+    Invoice invoice = invoiceRepository.findByIdAndOwnerId(invoiceId, user.getId())
+        .orElseThrow(() -> new AccessDeniedException("forbidden"));
+    byte[] pdf = invoiceService.render(invoice);
+    return ResponseEntity.ok(pdf);
+}
+```
+
+```java
+@PostAuthorize("returnObject.ownerId == authentication.principal.id")
+public User getUserForEdit(Long id) {
+    return userRepository.findById(id).orElseThrow();
+}
+```
+
+**Important:** Apply row-level security or tenant filters in every query path. Verify ACL before streaming file bytes from storage.
+
+### C#
+
+Use resource-based authorization and EF Core global filters for multi-tenant apps.
+
+```csharp
+[HttpGet("accounts/{accountId}")]
+public async Task<AccountDto> GetAccount(Guid accountId)
+{
+    var account = await _repo.GetAccount(accountId);
+    var auth = await _authorization.AuthorizeAsync(User, account, "AccountOwner");
+    if (!auth.Succeeded) throw new UnauthorizedAccessException();
+    return account;
+}
+
+// DbContext:
+modelBuilder.Entity<Account>().HasQueryFilter(a => a.TenantId == _tenantId);
+```
+
+**Important:** Separate read and write DTOs; never bind `UserId` from client on create. Integration-test that user A cannot GET user B's resource by ID swap.
+
+### Go
+
+Include both object ID and authenticated user ID in every sensitive SQL statement.
+
+```go
+func getMessage(w http.ResponseWriter, r *http.Request) {
+    user := userFromContext(r.Context())
+    id := mux.Vars(r)["id"]
+    var body string
+    err := db.QueryRow(
+        "SELECT body FROM messages WHERE id = $1 AND owner = $2",
+        id, user.ID,
+    ).Scan(&body)
+    if err != nil {
+        http.Error(w, "not found", http.StatusNotFound)
+        return
+    }
+    fmt.Fprint(w, body)
+}
+
+func updateAddress(w http.ResponseWriter, r *http.Request) {
+    user := userFromContext(r.Context())
+    addr := r.FormValue("address")
+    db.Exec("UPDATE addresses SET line = $1 WHERE user_id = $2", addr, user.ID)
+}
+```
+
+**Important:** Use S3 presigned URLs scoped to `users/{uid}/` namespaces. Centralize `CanAccess(user, objectType, id)` and call from all handlers.
+
+## Verify During Review
+
+- Object lookups include owner, tenant, or permission predicate tied to the authenticated principal.
+- Create and update operations ignore client-supplied ownership fields or validate them against policy.
+- File and export endpoints authorize each object, including batch and async jobs.
+- Indirect reference tokens are bound to the user session and expire appropriately.
+- Mobile, GraphQL, and internal APIs apply the same object-level checks as primary web routes.
+- Enumeration risk is reduced with rate limits and consistent 404/403 responses where policy allows.
+
+## Reference
+
+- [CWE-639: Authorization Bypass Through User-Controlled Key](https://cwe.mitre.org/data/definitions/639.html)
+- [OWASP Top 10 — Broken Access Control](https://owasp.org/www-project-top-ten/)
+- [OWASP IDOR Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html)
+- [Django — Object-level permissions](https://django-guardian.readthedocs.io/en/stable/)
+- [Spring Data — Query methods](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#jpa.query-methods)
+- [Spring Security — PostAuthorize](https://docs.spring.io/spring-security/reference/servlet/authorization/method-security.html)
+- [ASP.NET Core — Resource-based authorization](https://learn.microsoft.com/en-us/aspnet/core/security/authorization/resourcebased)
+- [EF Core — Global query filters](https://learn.microsoft.com/en-us/ef/core/querying/filters)
