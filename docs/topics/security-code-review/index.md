@@ -9,7 +9,20 @@ description: Personal notes and articles about reviewing code for security issue
 
 ## Security Code Review (WIP)
 
+**Current version: 0.6**
+
 Use this topic as a practical guide to security code review, with a focus on manual review skill and AI-assisted review.
+
+## Version history
+
+| Version | Date | What changed |
+| --- | --- | --- |
+| **0.6** | 2026-05-31 | Added **attack payload** sections (and related abuse/misconfiguration examples) across all `review-*` sub-chapters—for inspiration during authorized testing and to show how flaws manifest in practice. Added **language-specific commands, functions, and APIs** (Python, Java, C#, JavaScript, HTML, Go, SQL, Shell, C) with short code samples per sink to enrich understanding of each vulnerability, not only generic patterns. |
+| **0.5** | 2026-05-31 | Added Part IV (Chapter 10: OAuth, OIDC, JWT, SAML, TLS, mTLS, API signing) and Part V (Chapter 11: Snowflake, Databricks clean room, AWS IAM, Kubernetes, PostgreSQL). Renumbered AI assistance to Part VI and training/governance to Part VII. Added mini-chapter 4.41 (insecure coding practice). Standardized vulnerable-example language order (Python walkthrough; Java and C# first, then JS/HTML/Go/SQL/Shell/C when applicable). |
+| **0.4** | 2026-05-31 | Split Chapter 4 into 40 code-level mini-chapters (4.1–4.40) with a shared review template: vulnerability characteristics, Python sample, step-by-step walkthrough, risk impact, multi-language examples, fix sections with library code, and official documentation references. Replaced the monolithic Chapter 4 body with a hub page and grouped MkDocs navigation. |
+| **0.3** | 2026-05-17 | “Version 2” reorganization: 11 main chapters (0–9 + conclusion), action-oriented titles, reader-centered part summaries in the index. Merged tracing and business-logic review into Chapter 3 (System Decomposition Methodology). Consolidated code-level review into a single Chapter 4 overview; renumbered AI and program chapters (5–9). |
+| **0.2** | 2026-05-13 | Editorial pass: removed per-chapter “Source References” sections pointing at the local archive; tightened cross-links. Added and applied the security code review writing style rule (short sentences, action headings, reader-centered intros). |
+| **0.1** | 2026-05-13 | Initial minibook: preface, core chapters 0–11, conclusion, topic index, and *Secure Coding in Practice* reference article imported from materials. Separate chapters for manual methodology, data-flow tracing, business logic, and a single long code-level vulnerabilities chapter. |
 
 ## Preface
 

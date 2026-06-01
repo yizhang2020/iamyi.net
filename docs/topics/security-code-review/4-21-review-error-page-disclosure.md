@@ -30,6 +30,125 @@ The unsafe assumption is that only legitimate users will trigger errors. Attacke
 | **Partial handlers** | 404/500 pages configured without general fallback hiding stack traces |
 | **Version banners** | `Server`, `X-Powered-By`, framework version strings in production configs |
 
+## Attack Payloads
+
+Use these in authorized tests to trigger failures and inspect responses. Goal is to see whether stack traces, paths, or versions leak—not to exploit injection.
+
+### Pattern 1: Type and format errors
+
+```http
+GET /api/users/not-a-number HTTP/1.1
+POST /api/order {"quantity": "abc"} HTTP/1.1
+Content-Type: application/json
+
+{"id": null}
+```
+
+### Pattern 2: Missing resources and path probes
+
+```http
+GET /api/users/999999999 HTTP/1.1
+GET /../../../etc/passwd HTTP/1.1
+GET /%00/report HTTP/1.1
+```
+
+### Pattern 3: Database and query failures
+
+```http
+GET /search?q=' HTTP/1.1
+GET /report?sort=invalid_column HTTP/1.1
+```
+
+May return SQL syntax fragments, table names, or ORM query text in the body.
+
+### Pattern 4: Unhandled exceptions in business logic
+
+```http
+POST /transfer {"amount": -1, "to": ""} HTTP/1.1
+GET /export?format=__invalid__ HTTP/1.1
+```
+
+Divide-by-zero, null dereference, or assertion failures if not caught by a generic handler.
+
+### Pattern 5: Debug and health endpoints
+
+```http
+GET /error?debug=1 HTTP/1.1
+GET /__debug__/ HTTP/1.1
+TRACE / HTTP/1.1
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Find code paths that write exception details, stack traces, or framework diagnostics into HTTP responses.
+
+### Python
+
+```python
+import traceback
+return {"trace": traceback.format_exc()}, 500
+app.run(debug=True)
+# Flask/Werkzeug debugger, Django DEBUG=True in prod settings
+```
+
+Django: `DEBUG` template with stack trace. FastAPI: unhandled exception returns default detail with path.
+
+### Java
+
+```java
+e.printStackTrace(response.getWriter());
+return ResponseEntity.status(500).body(e.toString());
+server.error.include-stacktrace=always
+```
+
+Spring Boot: `server.error.include-message`, `include-binding-errors`. Servlet container default error pages.
+
+### C#
+
+```csharp
+catch (Exception ex) {
+    return Content(ex.ToString());
+}
+app.UseDeveloperExceptionPage();  // enabled in Production
+```
+
+ASP.NET Core: `DeveloperExceptionPageMiddleware`, `IncludeErrorDetail=true` on APIs.
+
+### JavaScript (Node.js)
+
+```javascript
+res.status(500).json({ error: err.message, stack: err.stack });
+app.use((err, req, res, next) => res.send(err.stack));
+process.env.NODE_ENV = 'development';
+```
+
+Express error handler returning `err.stack`; Next.js dev overlay config in production build.
+
+### Go
+
+```go
+http.Error(w, err.Error(), 500)
+fmt.Fprintf(w, "%+v\n", debug.Stack())
+```
+
+`panic` without `recover` middleware; `log.Printf` then echoing `err` to client.
+
+### PHP
+
+```php
+catch (Exception $e) { echo $e->getTraceAsString(); }
+ini_set('display_errors', '1');
+```
+
+Laravel `APP_DEBUG=true` in deployed `.env`.
+
+### Reverse proxy / server config
+
+```nginx
+# Default nginx/Apache 502 pages with version
+proxy_intercept_errors off;  # upstream stack body passed through
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

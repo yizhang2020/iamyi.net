@@ -31,6 +31,113 @@ The unsafe assumption is that TLS encryption alone proves which service is calli
 | **Mesh bypass paths** | Plain HTTP ports, `NetworkPolicy` gaps, debug ports, legacy jobs hitting services directly by pod IP |
 | **Rotation and revocation** | Long-lived client certs, shared cert across environments, no reissue on compromise, missing CRL/OCSP where required |
 
+## Abuse Scenarios
+
+Use these when reviewing service-to-service authentication and mesh-enforced mTLS.
+
+### Scenario 1: Optional client certificate (`VerifyClientCertIfGiven`)
+
+The server requests client certs but accepts connections without them. An attacker on the pod network connects without a cert and invokes internal admin APIs that operators assumed were mTLS-protected.
+
+### Scenario 2: Client cert present but not validated
+
+Node.js sets `requestCert: true` with `rejectUnauthorized: false`. A client presents an expired, self-signed, or wrong-CA certificate; the server reads CN and grants access anyway.
+
+### Scenario 3: Trust any internal CA
+
+Server trusts a broad enterprise root and accepts any client cert signed by that CA without checking SPIFFE ID or SAN against an allowlist. Compromise of any internal workload cert allows impersonation of any service.
+
+### Scenario 4: Header-based identity without verification
+
+Ingress sets `X-Forwarded-Client-Cert` or custom `X-Service-Identity` headers. Application trusts the header on plaintext localhost while sidecar mTLS is bypassed via direct port access.
+
+### Scenario 5: Mesh permissive mode left in production
+
+Istio `PeerAuthentication` is `PERMISSIVE` indefinitely. Plaintext and mTLS clients both reach the same handlers; attackers choose plaintext from compromised pods.
+
+### Scenario 6: Shared long-lived client cert in images
+
+One PKCS#12 client cert is baked into all microservice images. Leak from any container reveals identity usable against every internal API until manual revocation.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous: TLS without required client cert
+ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+# verify_mode defaults — client cert not required
+
+# Safer
+ctx.verify_mode = ssl.CERT_REQUIRED
+ctx.load_verify_locations(cafile="mesh-ca.pem")
+spiffe_id = peer_spiffe_id(conn.getpeercert())
+if spiffe_id not in ALLOWED_CALLERS: conn.close()
+```
+
+Also review: `uvicorn`/`gunicorn` SSL settings, `requests` client cert without server verify ([10.5](10-05-review-tls-ssl-protocol.md)).
+
+### Java
+
+```java
+// Dangerous: gRPC server TLS without client auth
+GrpcSslContexts.forServer(serverCert, serverKey).build();
+
+// Safer
+GrpcSslContexts.forServer(serverCert, serverKey)
+    .trustManager(clientCaBundle)
+    .clientAuth(ClientAuth.REQUIRE)
+    .build();
+```
+
+Also review: Netty `SslContextBuilder`, Spring Boot `server.ssl.client-auth=need`, Istio Java agent headers.
+
+See [gRPC Java TLS guide](https://grpc.io/docs/guides/auth/#with-server-authentication-ssltls).
+
+### C#
+
+```csharp
+// Dangerous: default ClientCertificateMode
+listen.UseHttps(https => { https.ServerCertificate = serverCert; });
+
+// Safer
+https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+https.ClientCertificateValidation = (cert, chain, errors) =>
+    errors == SslPolicyErrors.None && AllowedSpiffeIds.Contains(ExtractSpiffeId(cert));
+```
+
+See [ASP.NET Core certificate authentication](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/certauth).
+
+### Go
+
+```go
+// Dangerous
+tls.Config{ClientAuth: tls.VerifyClientCertIfGiven}
+
+// Safer
+tls.Config{
+    ClientAuth: tls.RequireAndVerifyClientCert,
+    ClientCAs:  clientCAPool,
+    MinVersion: tls.VersionTLS12,
+}
+// Authorize: r.TLS.PeerCertificates[0] SPIFFE SAN
+```
+
+Also review: SPIRE [go-spiffe](https://pkg.go.dev/github.com/spiffe/go-spiffe/v2/workloadapi), cert-manager mounted certs, Envoy SDS config.
+
+### JavaScript / infrastructure
+
+```yaml
+# Istio — permissive left in prod
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+spec:
+  mtls:
+    mode: PERMISSIVE
+```
+
+See [Python ssl verify_mode](https://docs.python.org/3/library/ssl.html#ssl.SSLContext.verify_mode), [Go tls ClientAuth](https://pkg.go.dev/crypto/tls#ClientAuthType), [SPIFFE](https://spiffe.io/docs/latest/spiffe-about/spiffe-concepts/), and [Istio PeerAuthentication](https://istio.io/latest/docs/reference/config/security/peer_authentication/).
+
 ## Sample Vulnerable Code in Python
 
 ```python

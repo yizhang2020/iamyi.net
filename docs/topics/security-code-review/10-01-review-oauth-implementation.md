@@ -34,6 +34,119 @@ This maps to broken authentication and session management patterns in [OWASP ASV
 | **Token storage** | Access or refresh tokens in localStorage, query strings, logs, or non-HttpOnly cookies |
 | **Library config** | Custom OAuth glue, disabled TLS verify on token requests, hardcoded client secrets in frontend bundles |
 
+## Abuse Scenarios
+
+Use these scenarios in authorized security tests and design reviews. Each assumes an attacker can influence redirects, callbacks, or client storage.
+
+### Scenario 1: Authorization code interception (no PKCE)
+
+A public SPA uses authorization code flow without PKCE. An attacker who learns the redirect URI registers a look-alike app or exploits an open redirect on the legitimate redirect URI. When the victim completes login, the attacker captures the `code` from the redirect and exchanges it at the token endpoint before the legitimate client does.
+
+### Scenario 2: CSRF on OAuth callback (missing state)
+
+The client omits `state` on the authorize request. An attacker starts their own OAuth login, then tricks the victim into visiting the victim app's callback URL with the attacker's `code`. The victim's session becomes bound to the attacker's IdP account—account linking or session fixation.
+
+### Scenario 3: Redirect URI manipulation
+
+The token exchange accepts `redirect_uri` from the query string or allows prefix matching (`https://app.example.com` matches `https://app.example.com.evil.com`). The attacker exchanges a stolen code using a registered or accepted alternate URI.
+
+### Scenario 4: Token leakage via browser storage
+
+Access or refresh tokens land in `localStorage`, URL fragments (implicit-style), or non-HttpOnly cookies. XSS or physical access to the device yields long-lived API access independent of password strength.
+
+### Scenario 5: Client secret in frontend bundle
+
+A "confidential" client secret is embedded in a mobile app or SPA JavaScript. Attackers extract it and call the token endpoint as the client, combining with stolen refresh tokens or password grant if enabled.
+
+### Scenario 6: TLS verification disabled on token calls
+
+The backend disables certificate verification when calling the IdP token endpoint (`verify=False`). A network attacker MITM's the token exchange and captures refresh tokens or injects malicious token responses.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+Search for OAuth client code and verify library defaults enforce PKCE, state, and TLS.
+
+### Python
+
+```python
+# Dangerous patterns
+requests.post(token_url, data={...}, verify=False)
+session["access_token"] = tokens["access_token"]  # no rotation policy
+redirect_uri = request.args.get("redirect_uri")  # attacker-controlled
+
+# Safer: Authlib Flask client
+from authlib.integrations.flask_client import OAuth
+oauth = OAuth(app)
+oauth.register(
+    name="idp",
+    client_id=os.environ["OAUTH_CLIENT_ID"],
+    client_secret=os.environ["OAUTH_CLIENT_SECRET"],
+    server_metadata_url="https://idp.example.com/.well-known/openid-configuration",
+)
+return oauth.idp.authorize_redirect(redirect_uri=FIXED_REDIRECT, state=state, code_challenge=challenge)
+```
+
+Also review: `authlib` token exchange, `requests-oauthlib` without PKCE, `httpx` with `verify=False` on token URL.
+
+### Java
+
+```java
+// Dangerous: Spring RestTemplate token exchange without PKCE; state ignored
+restTemplate.postForObject(tokenUrl, body, OAuth2AccessToken.class);
+
+// Safer: Spring Security OAuth2 Client
+http.oauth2Login(oauth -> oauth
+    .authorizationEndpoint(a -> a.authorizationRequestResolver(pkceResolver)));
+// application.yml: authorization-grant-type=authorization_code, issuer-uri=...
+```
+
+Also review: `spring-security-oauth2-client`, legacy `spring-security-oauth2` (deprecated), custom `OAuth2AuthorizedClientProvider`.
+
+### C#
+
+```csharp
+// Dangerous: manual token POST with user-supplied redirect
+await httpClient.PostAsync(tokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string> {
+    ["redirect_uri"] = Request.Query["returnUrl"],
+}));
+
+// Safer: Microsoft.Identity.Web / AddOpenIdConnect
+services.AddOpenIdConnect(options => {
+    options.UsePkce = true;
+    options.ResponseType = OpenIdConnectResponseType.Code;
+    options.CallbackPath = "/signin-oidc";
+});
+```
+
+Also review: `Microsoft.Identity.Client` (MSAL) for confidential vs public client patterns, `IdentityModel.OidcClient`.
+
+### JavaScript
+
+```javascript
+// Dangerous: implicit flow, localStorage tokens
+window.location = `${AUTH}/authorize?response_type=token&client_id=${ID}`;
+localStorage.setItem('access_token', hash.get('access_token'));
+
+// Safer: oauth4webapi / openid-client on backend BFF only
+// Browser never holds refresh token; backend uses authorization code + PKCE
+```
+
+Also review: `passport-oauth2`, `@auth0/nextjs-auth0` config, Electron apps embedding client secrets.
+
+### Go
+
+```go
+// Dangerous: no state; redirect from Host header
+redirectURI := "https://" + r.Host + "/callback"
+
+// Safer: golang.org/x/oauth2 with PKCE
+verifier := oauth2.GenerateVerifier()
+url := config.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
+token, err := config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+```
+
+See [Authlib documentation](https://docs.authlib.org/en/latest/), [Spring Security OAuth2 Client](https://docs.spring.io/spring-security/reference/servlet/oauth2/client/index.html), [Microsoft Identity Web](https://learn.microsoft.com/en-us/entra/msal/dotnet/), and [golang.org/x/oauth2](https://pkg.go.dev/golang.org/x/oauth2).
+
 ## Sample Vulnerable Code in Python
 
 ```python

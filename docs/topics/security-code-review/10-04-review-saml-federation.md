@@ -35,6 +35,102 @@ This relates to [CWE-347](https://cwe.mitre.org/data/definitions/347.html) and [
 | **XML processing** | XXE-enabled parsers, external DTD allowed—see [4.08 Review XXE](4-08-review-xxe.md) |
 | **Metadata exchange** | Unsigned metadata trusted, SP uploads attacker IdP metadata in self-service config |
 
+## Abuse Scenarios
+
+Use these when reviewing SAML SP endpoints, metadata upload flows, and assertion processing.
+
+### Scenario 1: Unsigned assertion acceptance
+
+The SP parses SAML XML and extracts `NameID` without XML signature validation. An attacker POSTs a crafted `SAMLResponse` to the ACS URL and logs in as any user.
+
+### Scenario 2: Assertion replay
+
+A captured legitimate `SAMLResponse` is replayed within `NotOnOrAfter`. The SP does not track assertion IDs or `InResponseTo`, so the same response grants access repeatedly or on another victim session.
+
+### Scenario 3: Wrong recipient / ACS URL
+
+The SP accepts assertions whose `Destination` or `Recipient` does not match the registered ACS URL. Attacker replays assertions intended for a different SP instance or environment.
+
+### Scenario 4: Audience mismatch ignored
+
+`AudienceRestriction` is missing or not compared to SP entity ID. Assertions minted for a staging SP work against production.
+
+### Scenario 5: Malicious IdP metadata import
+
+Self-service tenant onboarding accepts arbitrary metadata URLs. Attacker supplies metadata pointing to attacker IdP; users authenticate against attacker-controlled keys.
+
+### Scenario 6: Open redirect via RelayState
+
+After login, the SP redirects to unvalidated `RelayState`. Attacker phishes victims through a trusted domain to an external site or steals tokens from URL parameters.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous: manual XML parse without signature
+name_id = parse_nameid_from_xml(base64.b64decode(SAMLResponse))
+
+# Safer: python3-saml with strict settings
+from onelogin.saml2.auth import OneLogin_Saml2_Auth
+auth = OneLogin_Saml2_Auth(request_data, old_settings=settings)
+auth.process_response()
+if not auth.is_authenticated() or auth.get_errors():
+    abort(403)
+```
+
+Settings must include `strict: True`, `wantAssertionsSigned: True`, and trusted IdP cert from reviewed metadata.
+
+### Java
+
+```java
+// Dangerous: DOM parse NameID only
+DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(stream);
+
+// Safer: Spring Security SAML2 Service Provider
+http.saml2Login(Customizer.withDefaults());
+// RelyingPartyRegistration.fromMetadataLocation(...).entityId(...).assertionConsumerServiceLocation(...)
+```
+
+Also review: OpenSAML low-level usage without validation, Pac4j misconfiguration.
+
+### C#
+
+```csharp
+// Dangerous
+var response = new Response(SAMLResponse);  // validate: false
+var nameId = response.GetNameID();
+
+// Safer: ITfoxtec.Identity.Saml2
+var saml2AuthnResponse = new Saml2AuthnResponse(config);
+saml2AuthnResponse.ReadSamlResponse(Request, validate: true);
+```
+
+Also review: `Sustainsys.Saml2`, Azure AD SAML integration defaults.
+
+### JavaScript
+
+```javascript
+// Dangerous: regex extract NameID
+const nameID = xml.match(/<NameID[^>]*>([^<]+)<\/NameID>/)[1];
+
+// Safer: @node-saml/node-saml or samlify with cert and audience checks
+const { SAML } = require('@node-saml/node-saml');
+const profile = await saml.validatePostResponseAsync(body);
+```
+
+### Go
+
+```go
+// Dangerous
+nameID := xmlquery.FindOne(doc, "//NameID").InnerText()
+
+// Safer: crewjam/saml
+assertion, err := sp.ParseResponse(r, []string{pendingAuthnRequestID})
+```
+
+See [OneLogin python3-saml](https://github.com/SAML-Toolkits/python3-saml), [Spring Security SAML2](https://docs.spring.io/spring-security/reference/servlet/saml2/login/index.html), [ITfoxtec.Identity.Saml2](https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2), and [crewjam/saml](https://github.com/crewjam/saml).
+
 ## Sample Vulnerable Code in Python
 
 ```python

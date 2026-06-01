@@ -31,6 +31,103 @@ The unsafe assumption is that obscurity, home-grown routines, or legacy protocol
 | **Custom crypto** | XOR loops, ECB mode, static IVs, hand-rolled AES, missing authentication on ciphertext |
 | **Data at rest** | Database columns, flat files, S3 objects, backups, and caches holding PII, tokens, or payment data |
 
+## Abuse Scenarios
+
+Use these patterns in authorized tests and code search. They are not injection strings—they show how weak crypto choices fail in practice.
+
+### Pattern 1: Weak password hashing (MD5, SHA1, unsalted SHA-256)
+
+```text
+register("alice", "P@ssw0rd123")
+# Stored: 482c811da5d5b4bc6d497ffa98491e38  (MD5 — crackable offline)
+```
+
+### Pattern 2: TLS verification disabled (`verify=False`)
+
+```python
+requests.get("https://partner.example/report", verify=False)
+# MITM can replace response or steal bearer tokens in transit
+```
+
+### Pattern 3: ECB mode and static IV (pattern leakage)
+
+```text
+# Two blocks of identical plaintext produce identical ciphertext blocks
+encrypt_ecb(b"alice@corp.com    ")  # 16-byte aligned repeats visible in output
+```
+
+### Pattern 4: Hardcoded or default keys in source
+
+```text
+SECRET_KEY = "changeme"
+JWT signing with dev key shipped to production
+```
+
+### Pattern 5: Custom XOR or “obfuscation” treated as encryption
+
+```text
+def protect(s): return ''.join(chr(ord(c) ^ 0x5A) for c in s)
+# Trivially reversible; not a substitute for AES-GCM or envelope encryption
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for these symbols when reviewing crypto, TLS, and secret handling.
+
+### Python
+
+```python
+import hashlib, ssl, requests
+hashlib.md5(password.encode()).hexdigest()
+hashlib.sha1(data).digest()
+from Crypto.Cipher import AES
+AES.new(key, AES.MODE_ECB).encrypt(plain)
+requests.get(url, verify=False)
+ssl._create_unverified_context()
+```
+
+### Java
+
+```java
+MessageDigest.getInstance("MD5").digest(password.getBytes());
+Cipher.getInstance("AES/ECB/PKCS5Padding");
+SSLContext.getInstance("SSL").init(null, trustAllCerts, null);
+HttpsURLConnection.setDefaultHostnameVerifier((h, s) -> true);
+```
+
+### C#
+
+```csharp
+MD5.Create().ComputeHash(Encoding.UTF8.GetBytes(password));
+Aes.Create(); aes.Mode = CipherMode.ECB;
+new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true });
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const crypto = require('crypto');
+crypto.createHash('md5').update(password).digest('hex');
+crypto.createCipheriv('aes-128-ecb', key, null);
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+```
+
+### Go
+
+```go
+md5.Sum([]byte(password))
+aes.NewCipher(key) // used in ECB-style loops without GCM
+http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+```
+
+### C
+
+```c
+MD5(password, len, digest);
+EVP_aes_128_ecb();
+SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

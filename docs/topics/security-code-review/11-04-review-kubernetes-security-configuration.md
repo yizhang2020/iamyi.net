@@ -33,6 +33,136 @@ The unsafe assumption is that container isolation replaces network and API autho
 | **PSA gaps** | Namespace without `pod-security.kubernetes.io/enforce=restricted` |
 | **Host path mounts** | Docker socket or `/etc/kubernetes` mounted into application pods |
 
+## Misconfiguration Examples
+
+Use these when reviewing Helm charts, Kustomize overlays, and cluster bootstrap manifests.
+
+### Example 1: cluster-admin for default service account
+
+```yaml
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: production
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+```
+
+Any pod using `default` SA in production can read all secrets cluster-wide and deploy workloads.
+
+### Example 2: Secret via environment variable
+
+```yaml
+env:
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: db-credentials
+        key: password
+```
+
+Password visible in `kubectl describe pod`, `/proc`, crash dumps, and some APM agents.
+
+### Example 3: Privileged pod without NetworkPolicy
+
+```yaml
+containers:
+  - name: api
+    securityContext:
+      privileged: true
+    image: myregistry/api:latest
+```
+
+No NetworkPolicy in namespace—privileged pod may reach metadata service, kube-api, and all pod IPs.
+
+### Example 4: Missing Pod Security Admission
+
+Namespace without `pod-security.kubernetes.io/enforce: restricted` allows hostPath, root user, and capability adds in production.
+
+### Example 5: Automounted API token on every pod
+
+Default service account with automount enabled and Role granting `secrets` list in all namespaces—lateral movement after one compromise.
+
+## SDK/IaC Sinks and Dangerous Patterns
+
+### Kubernetes YAML (manifest sinks)
+
+```yaml
+# RBAC
+verbs: ["*"]; resources: ["*"]; apiGroups: ["*"]
+clusterRoleRef.name: cluster-admin
+
+# Pod spec
+privileged: true
+hostNetwork: true
+hostPID: true
+automountServiceAccountToken: true  # default SA
+
+# Secrets
+env.valueFrom.secretKeyRef
+envFrom.secretRef  # bulk env injection
+
+# Images
+image: myapp:latest  # no digest
+```
+
+Also review: `hostPath` mounts, `capabilities.add: ["SYS_ADMIN"]`, `runAsUser: 0`, wildcard `Ingress` to admin interfaces.
+
+### Python (kubernetes client)
+
+```python
+from kubernetes import client, config
+config.load_incluster_config()
+v1 = client.CoreV1Api()
+v1.list_secret_for_all_namespaces()  # over-permissioned RBAC
+secret = v1.read_namespaced_secret("db-credentials", "production")
+print(secret.data)  # logged
+password = os.environ["DATABASE_PASSWORD"]
+```
+
+Also review: `kubectl` in CI with cluster-admin kubeconfig, Helm `--set database.password=...`.
+
+### Java (fabric8 kubernetes-client)
+
+```java
+KubernetesClient client = new KubernetesClientBuilder().build();
+client.secrets().inAnyNamespace().list();
+String password = System.getenv("DATABASE_PASSWORD");
+```
+
+Also review: Spring Cloud Kubernetes secret config import to env vars in prod profile.
+
+### Terraform / Helm
+
+```hcl
+resource "kubernetes_cluster_role_binding" "app_admin" {
+  role_ref { name = "cluster-admin" }
+  subject { name = "default" }
+}
+```
+
+```yaml
+# values.prod.yaml — reintroduces dev RBAC
+rbac:
+  create: true
+  clusterAdmin: true
+secrets:
+  exposeAsEnv: true
+```
+
+Also review: `helm template` output before apply, Kustomize `patchesStrategicMerge` promoting dev overlays.
+
+### C# (k8s client / ASP.NET)
+
+```csharp
+var k8s = new Kubernetes(KubernetesClientConfiguration.InClusterConfig());
+var secrets = await k8s.CoreV1.ListSecretForAllNamespacesAsync();
+var signingKey = Environment.GetEnvironmentVariable("JWT_SIGNING_KEY");
+```
+
+See [Kubernetes Python client](https://github.com/kubernetes-client/python), [fabric8 kubernetes-client](https://github.com/fabric8io/kubernetes-client), [RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/), and [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/).
+
 ## Sample Vulnerable Configuration in Python
 
 Policy-as-code checks (OPA Rego, Python validators in CI) catch risky manifests before deploy.

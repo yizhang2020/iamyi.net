@@ -33,6 +33,107 @@ This maps to [CWE-347](https://cwe.mitre.org/data/definitions/347.html) and [CWE
 | **Validation gaps** | Resource servers fetch JWKS once at startup; no `iss`/`aud` enforcement per API |
 | **Revocation** | Logout clears client cookie only; no server-side refresh denylist or token version claim |
 
+## Abuse Scenarios
+
+Use these when reviewing custom authorization servers and resource APIs that mint or consume JWTs.
+
+### Scenario 1: HS256 secret exfiltration → universal forgery
+
+One shared symmetric secret is copied into twenty microservices and a mobile app. An attacker extracts it from any artifact and mints tokens with arbitrary `sub`, `scope`, and `admin` claims.
+
+### Scenario 2: Refresh token replay (no rotation)
+
+Refresh tokens are valid until expiry and reusable without bound. XSS steals the refresh token; attacker obtains new access tokens for months without re-authentication.
+
+### Scenario 3: Refresh reuse undetected
+
+The server issues a new refresh token on refresh but does not invalidate the previous one. Stolen old refresh tokens continue to work alongside new ones.
+
+### Scenario 4: JWKS never refreshed
+
+Resource servers cache JWKS at startup. After key compromise, auth server rotates keys but stale validators accept old `kid` or fail open to HS256 fallback with a dev secret.
+
+### Scenario 5: Missing audience on resource server
+
+API accepts any token signed by the org issuer regardless of `aud`. Token minted for public web client is replayed to internal admin API.
+
+### Scenario 6: Long-lived access token with embedded roles
+
+Access token lifetime is 30 days with `roles: ["admin"]` inside. Admin lockout or role change has no effect until token expiry.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous issuance
+jwt.encode({"sub": uid, "admin": True, "exp": now + timedelta(days=7)}, SECRET, algorithm="HS256")
+jwt.decode(token, SECRET, algorithms=["HS256", "none"])  # resource server
+
+# Safer: authlib.jose RS256 + JWKS endpoint; PyJWT with explicit algorithms
+from authlib.jose import jwt as jose_jwt
+access = jose_jwt.encode({"alg": "RS256", "kid": kid}, claims, private_key)
+# Resource server: fetch JWKS, require aud/iss/exp
+import jwt as pyjwt
+pyjwt.decode(token, key=public_key, algorithms=["RS256"], audience="api.example.com", issuer="https://auth.example.com")
+```
+
+Also review: `python-jose` `jwt.decode` defaults, `flask-jwt-extended` configuration.
+
+### Java
+
+```java
+// Dangerous: jjwt HS256 secret in source; 30-day exp
+Jwts.builder().setExpiration(thirtyDays).signWith(SignatureAlgorithm.HS256, SECRET);
+
+// Safer: jjwt RS256 + NimbusJwtDecoder with JWK Set URI
+Jwts.parserBuilder().setSigningKeyResolver(jwkResolver).requireIssuer("https://auth.example.com").build();
+NimbusJwtDecoder.withJwkSetUri("https://auth.example.com/.well-known/jwks.json").build();
+```
+
+Also review: [jjwt](https://github.com/jwtk/jjwt), Spring Authorization Server, Keycloak adapter configs.
+
+### C#
+
+```csharp
+// Dangerous
+new JwtSecurityToken(..., expires: DateTime.UtcNow.AddDays(30), signingCredentials: hmacCreds);
+
+// Safer: AddJwtBearer with Authority + Audience; RSA signing at auth server
+services.AddAuthentication().AddJwtBearer(o => {
+    o.Authority = "https://auth.example.com";
+    o.Audience = "api.example.com";
+    o.TokenValidationParameters.ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 };
+});
+```
+
+Also review: `IdentityModel`, Azure AD token validation, `Microsoft.AspNetCore.Authentication.JwtBearer`.
+
+### JavaScript
+
+```javascript
+// Dangerous
+jwt.sign({ sub: user.id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+jwt.verify(token, secret);  // no aud/iss
+
+// Safer: jose library with JWKS
+import * as jose from 'jose';
+const JWKS = jose.createRemoteJWKSet(new URL('https://auth.example.com/.well-known/jwks.json'));
+const { payload } = await jose.jwtVerify(token, JWKS, { issuer: 'https://auth.example.com', audience: 'api.example.com' });
+```
+
+### Go
+
+```go
+// Dangerous
+jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(os.Getenv("JWT_SECRET")))
+
+// Safer: golang-jwt + lestrrat-go/jwx JWKS
+token, err := jwt.Parse(raw, jwt.WithKeySet(jwkSet), jwt.WithAudience("api.example.com"), jwt.WithIssuer("https://auth.example.com"))
+```
+
+See [Authlib JOSE](https://docs.authlib.org/en/latest/jose/index.html), [jjwt](https://github.com/jwtk/jjwt), [RFC 8725 JWT BCP](https://www.rfc-editor.org/rfc/rfc8725), and [lestrrat-go/jwx](https://pkg.go.dev/github.com/lestrrat-go/jwx/v2).
+
 ## Sample Vulnerable Code in Python
 
 ```python

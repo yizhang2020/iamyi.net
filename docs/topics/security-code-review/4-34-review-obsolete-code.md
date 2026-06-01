@@ -31,6 +31,145 @@ The unsafe assumption is that unused code is harmless because "nobody calls it."
 | **Build gaps** | Debug controllers in Release builds, test packages bundled into production JARs |
 | **Static analysis hits** | Unreferenced methods, unreachable branches flagged by coverage or linters |
 
+## Attack Payloads
+
+Use these in authorized tests when probing for forgotten routes, debug handlers, and feature-flag bypasses. Replace `TARGET` with the endpoint or parameter under review.
+
+### Pattern 1: Direct legacy URL access
+
+```text
+GET /upload/v0
+GET /api/v0/login
+GET /admin/legacy/export
+POST /debug/reset-db
+```
+
+Many obsolete paths remain registered but undocumented. Scanners and wordlists often discover them before product teams do.
+
+### Pattern 2: Feature-flag enablement
+
+```text
+ENABLE_OLD_UPLOAD=1
+FEATURE_DEBUG_ROUTES=true
+X-Enable-Legacy-Auth: 1
+?use_legacy=true
+```
+
+If flags default to on in production or can be toggled via env or headers, weaker code paths activate without code changes.
+
+### Pattern 3: Debug header or token bypass
+
+```text
+X-Debug: 1
+X-Test-Mode: true
+Authorization: Bearer debug-token
+?debug=1
+```
+
+Test helpers that check a header instead of environment allow any caller who learns the header name.
+
+### Pattern 4: Old API version routing
+
+```text
+Accept: application/vnd.company.v0+json
+/api/v0/users/1
+/mobile/v1/session  (app still bundles v1 URL)
+```
+
+Mobile clients and integration partners may call deprecated versions long after web UI migration.
+
+### Pattern 5: Profiling and actuator endpoints
+
+```text
+/debug/pprof/
+/actuator/env
+/metrics
+/_internal/health?verbose=1
+```
+
+Profiling and Spring Boot actuator endpoints expose internals when left enabled in production builds.
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for route registration, feature toggles, and debug handlers that may ship in production artifacts.
+
+### Python
+
+```python
+if os.getenv("ENABLE_OLD_UPLOAD") == "1":
+    @app.route("/upload/v0")
+    def upload_v0(): ...
+
+@app.route("/debug/reset-db")
+def reset_db(): ...
+
+from werkzeug.middleware.profiler import ProfilerMiddleware
+app.wsgi_app = ProfilerMiddleware(app.wsgi_app)  # no env gate
+
+import flask_debugtoolbar
+app.config["DEBUG_Toolbar_ENABLED"] = True
+```
+
+Also review: `django.conf.urls` legacy includes, FastAPI `include_router` for `/debug`, `ENABLE_DEBUG` in settings.
+
+### Java
+
+```java
+@Profile("!prod")  // misconfigured — profile not active but class still scanned
+@RestController
+@RequestMapping("/debug")
+public class DebugController { ... }
+
+@PostMapping("/upload/v0")  // no @Deprecated removal schedule
+public void uploadV0(...) { ... }
+
+management.endpoints.web.exposure.include=*  // actuator wide open
+```
+
+Spring: `spring.profiles.active` missing in prod; `@ConditionalOnProperty` with `matchIfMissing = true`.
+
+### C#
+
+```csharp
+#if DEBUG
+[Route("debug/[controller]")]
+#endif
+// Same controller duplicated outside #if — ships in Release
+
+if (Configuration["Features:LegacyUpload"] == "true")
+    endpoints.MapPost("/upload/v0", UploadV0);
+
+app.UseDeveloperExceptionPage();  // not wrapped in IsDevelopment()
+```
+
+### JavaScript (Node.js)
+
+```javascript
+if (process.env.ENABLE_LEGACY === '1') {
+  app.post('/upload/v0', uploadV0);
+}
+app.use('/debug', debugRouter);  // always mounted
+require('./routes/test-users');  // test routes imported in server.js
+```
+
+### Go
+
+```go
+if os.Getenv("ENABLE_DEBUG") == "1" {
+    http.HandleFunc("/debug/pprof/", pprof.Index)
+}
+http.HandleFunc("/upload/v0", uploadV0)  // never removed
+http.HandleFunc("/internal/backdoor/status", statusHandler)
+```
+
+### Shell / Docker
+
+```dockerfile
+ENV ENABLE_OLD_UPLOAD=1
+ENV FLASK_DEBUG=1
+COPY tests/fixtures/mock_auth.py /app/
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

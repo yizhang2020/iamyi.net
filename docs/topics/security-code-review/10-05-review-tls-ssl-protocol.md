@@ -32,6 +32,115 @@ The unsafe assumption is that any TLS handshake is equivalent to a verified, cor
 | **Hostname checks** | Disabled `check_hostname`, custom `SSLContext` without server name indication (SNI), IP literals without SAN coverage |
 | **Certificate lifecycle** | Expired or self-signed certs in prod, missing intermediate chain, wildcard certs on unrelated services |
 
+## Abuse Scenarios
+
+Use these when reviewing outbound HTTPS clients, API integrations, and TLS termination configuration.
+
+### Scenario 1: MITM on outbound API calls (`verify=False`)
+
+A microservice calls partner APIs with certificate verification disabled to work around a corporate proxy or self-signed test cert. The misconfiguration ships to production. A network attacker presents any certificate and reads OAuth tokens, API keys, and PII from TLS plaintext.
+
+### Scenario 2: Global TLS disable in Node.js
+
+`NODE_TLS_REJECT_UNAUTHORIZED=0` is set in a Docker image or systemd unit for "development" and never removed. Every `https` request from that process accepts forged certificates.
+
+### Scenario 3: Trust-all Java TrustManager
+
+Custom `X509TrustManager` with empty `checkServerTrusted` ships in a shared HTTP utility class. All Java services using the helper are vulnerable to MITM regardless of URL scheme.
+
+### Scenario 4: Hostname verification disabled
+
+Client validates the certificate chain but sets `check_hostname = False` or `InsecureSkipVerify: true`. Attacker presents a valid certificate for `attacker.example` while the app intended `api.partner.example`.
+
+### Scenario 5: Protocol downgrade
+
+Server or client still accepts TLS 1.0/1.1 or weak cipher suites. Attacker forces downgrade to exploit known protocol weaknesses or weak crypto.
+
+### Scenario 6: Incomplete server chain
+
+Server presents only the leaf certificate without intermediates. Some clients fail; others may prompt or fall back to insecure trust-on-first-use patterns in internal tools.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous
+requests.get(url, verify=False)
+httpx.Client(verify=False)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+
+# Safer: default verification; corporate CA via verify= path
+import requests
+resp = requests.get("https://api.partner.example/v1/data", timeout=10)
+resp = requests.get(url, verify="/etc/ssl/certs/corp-ca.pem", timeout=10)
+```
+
+Also review: `aiohttp` `TCPConnector(ssl=False)`, `urllib.request.urlopen` with custom context, `boto3`/`botocore` `verify=False`.
+
+See [Python requests SSL verification](https://requests.readthedocs.io/en/latest/user/advanced/#ssl-cert-verification) and [httpx SSL](https://www.python-httpx.org/advanced/ssl/).
+
+### Java
+
+```java
+// Dangerous
+conn.setSSLSocketFactory(trustAllFactory);
+conn.setHostnameVerifier((h, s) -> true);
+HttpClients.custom().setSSLContext(trustAll).build();
+
+// Safer: default SSLContext and HttpClient
+HttpClient client = HttpClient.newBuilder().build();
+// Apache HttpClient 5: use system trust store, default hostname verifier
+```
+
+Also review: `RestTemplate` with custom `HttpComponentsClientHttpRequestFactory`, gRPC `usePlaintext()`, JDBC `sslmode=disable`.
+
+See [Java JSSE Reference Guide](https://docs.oracle.com/en/java/javase/21/security/java-secure-socket-extension-jsse-reference-guide.html).
+
+### C#
+
+```csharp
+// Dangerous
+handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+
+// Safer: default HttpClient
+var client = new HttpClient();
+await client.GetStringAsync("https://api.example.com/v1/export");
+```
+
+Also review: `ServicePointManager.ServerCertificateValidationCallback`, legacy `ServicePointManager.SecurityProtocol` enabling SSL3/TLS1.
+
+See [HttpClient certificate validation](https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient#secure-the-connection).
+
+### JavaScript
+
+```javascript
+// Dangerous
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+https.get(url, { rejectUnauthorized: false });
+axios.get(url, { httpsAgent: new https.Agent({ rejectUnauthorized: false }) });
+
+// Safer: default agent; pin corporate CA via ca: fs.readFileSync('corp.pem')
+```
+
+See [Node.js TLS documentation](https://nodejs.org/api/tls.html).
+
+### Go
+
+```go
+// Dangerous
+tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionSSL30}
+
+// Safer: system pool + MinVersion TLS 1.2
+pool, _ := x509.SystemCertPool()
+tr := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
+```
+
+Also review: `grpc.WithTransportCredentials(insecure.NewCredentials())`, database drivers with `sslmode=disable`.
+
+See [Go crypto/tls](https://pkg.go.dev/crypto/tls).
+
 ## Sample Vulnerable Code in Python
 
 ```python

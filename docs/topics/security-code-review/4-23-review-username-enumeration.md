@@ -30,6 +30,114 @@ The unsafe assumption is that friendly error text helps only legitimate users. D
 | **Weak controls** | 404 for unknown email, explicit "already registered", distinct login failure messages |
 | **API leaks** | JSON fields like `exists: true`, different error codes per case |
 
+## Attack Payloads
+
+Use these in authorized tests on login, registration, and password reset. Compare body, status code, headers, and timing for known-valid versus unknown identifiers.
+
+### Pattern 1: Distinct error messages (login abuse scenario)
+
+```http
+POST /login
+{"user":"known@victim.com","password":"wrong"}
+→ {"error":"Invalid password"}
+
+POST /login
+{"user":"unknown@attacker.com","password":"wrong"}
+→ {"error":"User does not exist"}
+```
+
+### Pattern 2: HTTP status discrepancy
+
+```http
+POST /reset {"email":"registered@victim.com"} → 200 OK
+POST /reset {"email":"notregistered@x.com"}    → 404 Not Found
+```
+
+### Pattern 3: Registration and invite flows
+
+```http
+POST /register {"email":"taken@victim.com"}
+→ {"error":"Email already registered"}
+
+POST /register {"email":"new@attacker.com"}
+→ {"ok":true}
+```
+
+### Pattern 4: JSON existence flags
+
+```json
+{"exists": true, "message": "Check your email"}
+{"exists": false, "message": "No account found"}
+```
+
+### Pattern 5: Timing side channel
+
+Repeated requests for unknown emails may return faster when the server skips mail queue or DB work. Measure response time distributions across many samples.
+
+### Pattern 6: Password reset email behavior
+
+Observe whether an outbound email is sent only when the account exists, or whether UI text differs ("We sent a link" vs "Unknown user").
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for branches that return different content when a user record is missing versus present.
+
+### Python
+
+```python
+if not user:
+    return jsonify({"error": "No account with that email"}), 404
+return jsonify({"error": "Invalid password"})  # reveals valid user
+```
+
+Django `authenticate` followed by distinct messages; Flask `flash()` with different strings.
+
+### Java
+
+```java
+if (user == null) {
+    resp.sendError(404, "User not found");
+} else {
+    resp.sendError(401, "Bad password");
+}
+return Map.of("registered", user != null);
+```
+
+Spring Security custom `AuthenticationFailureHandler` with per-case messages.
+
+### C#
+
+```csharp
+if (user == null)
+    return NotFound("Email not registered");
+return Unauthorized("Wrong password");
+```
+
+ASP.NET Identity error descriptions exposed to the client.
+
+### JavaScript
+
+```javascript
+if (!user) return res.status(404).json({ error: "Unknown email" });
+return res.status(401).json({ error: "Wrong password" });
+```
+
+### Go
+
+```go
+if user == nil {
+    http.Error(w, "no such user", http.StatusNotFound)
+    return
+}
+```
+
+### HTML and template leaks
+
+```html
+<!-- Reset form only rendered when user exists -->
+{% if user_found %}<p>Email sent</p>{% else %}<p>Unknown account</p>{% endif %}
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

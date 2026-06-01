@@ -32,6 +32,113 @@ The unsafe assumption is that any encryption call makes data safe. Correct desig
 | **Oracle behavior** | Decryption endpoints returning different errors for padding vs format failures |
 | **Wrong primitive** | Reversible encryption of passwords instead of adaptive hashing |
 
+## Attack Payloads
+
+Use these in authorized cryptographic review and lab testing—not against production decryption endpoints without approval.
+
+### Pattern 1: Padding oracle probing (CBC)
+
+```text
+# Send modified ciphertext blocks; observe distinct error responses:
+# "bad padding" vs "invalid format" vs HTTP 500 timing differences
+# Each distinguishable response may leak one plaintext byte
+```
+
+### Pattern 2: ECB pattern analysis
+
+```text
+# Encrypt repeated 16-byte blocks; identical ciphertext blocks reveal structure
+# Example: identical blocks in encrypted JSON with repeated keys
+{"user":"admin","role":"admin"}  # repeated "admin" blocks align in ECB
+```
+
+### Pattern 3: GCM nonce reuse
+
+```text
+# Reusing (key, nonce) pair with different plaintexts breaks GCM confidentiality
+# Attackers XOR ciphertexts to derive plaintext XOR relationships
+```
+
+### Pattern 4: Static IV exploitation
+
+```text
+# Same IV + same key + different messages → deterministic ciphertext prefixes
+# Enables equality leaks and some chosen-plaintext analysis
+```
+
+### Pattern 5: Hardcoded key from source leak
+
+```text
+# Key in git history: KEY = b"0123456789012345"
+# Decrypt all historical ciphertext after repo fork or leak
+grep -r "0123456789012345" .
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+AES.new(KEY, AES.MODE_ECB)
+AES.new(KEY, AES.MODE_CBC, iv=STATIC_IV)  # no HMAC
+from Crypto.Cipher import DES3
+Fernet(HARDCODED_KEY)
+hashlib.pbkdf2_hmac(..., iterations=1000)  # too low
+cryptography.hazmat... without AEAD
+base64.b64encode(data)  # mistaken for encryption
+```
+
+Also review: `pycryptodome` without authentication tag, password-based keys without salt/KDF.
+
+### Java
+
+```java
+Cipher.getInstance("AES/ECB/PKCS5Padding");
+Cipher.getInstance("DES/ECB/PKCS5Padding");
+Cipher.getInstance("AES/CBC/PKCS5Padding");  // no GCM/HMAC
+SecretKeySpec(hardcodedBytes, "AES");
+IvParameterSpec(staticIv);
+PBEWithMD5AndDES
+BadPaddingException caught and rethrown with distinct message
+```
+
+### C#
+
+```csharp
+Aes.Create(); aes.Mode = CipherMode.ECB;
+Aes.Create(); aes.Mode = CipherMode.CBC;  // no GCM
+RijndaelManaged with static IV
+ProtectedData.Protect with hardcoded entropy
+Convert.ToBase64String(plaintext)  // encoding only
+CryptographicException message leaked to client
+```
+
+### Go
+
+```go
+aes.NewCipher(key)  // manual ECB loop
+cipher.NewCBCEncrypter(block, staticIV)
+des.NewCipher(key)
+// missing cipher.NewGCM for authenticated encryption
+errors.New("bad padding") returned to HTTP client
+```
+
+### C
+
+```c
+AES_ecb_encrypt(...);
+AES_cbc_encrypt(..., iv, AES_ENCRYPT);  // static iv
+DES_ncbc_encrypt(...);
+EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), ...);
+```
+
+### SQL / config
+
+```sql
+-- Key stored beside ciphertext in same row
+UPDATE users SET encrypted_ssn = ..., encryption_key = '...' WHERE id = 1;
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

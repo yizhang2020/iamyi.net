@@ -31,6 +31,112 @@ The unsafe assumption is that source is private and that obscurity protects embe
 | **Connection strings** | JDBC, MongoDB, Redis, SMTP URLs with embedded usernames and passwords |
 | **Client exposure** | JavaScript bundles, mobile source, public config endpoints shipping server keys |
 
+## Attack Payloads
+
+Use static analysis and string extraction—these abuse scenarios assume an attacker reads source, binaries, or client bundles.
+
+### Pattern 1: Literal API and cloud keys in source
+
+```python
+AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
+STRIPE_KEY = "sk_live_51H..."
+```
+
+### Pattern 2: Hardcoded authentication bypass
+
+```java
+if ("debug123".equals(password)) { return adminUser(); }
+if (apiKey.equals("hardcoded-backdoor-key")) { grantAccess(); }
+```
+
+### Pattern 3: Embedded connection strings
+
+```text
+mongodb://admin:SuperSecret@db.internal:27017/prod
+jdbc:mysql://app:DbP@ss@localhost:3306/billing
+```
+
+### Pattern 4: Symmetric and signing keys in repo
+
+```text
+JWT_SECRET = "not-so-random-string"
+HMAC_KEY = b'\x00\x01...'  # 16 bytes in constants.py
+-----BEGIN PRIVATE KEY-----
+```
+
+### Pattern 5: Mobile and front-end bundles
+
+```javascript
+const FIREBASE_API_KEY = "AIzaSy...";
+const INTERNAL_API = "https://api.internal.corp?key=SECRET";
+```
+
+### Pattern 6: CI and example files with real values
+
+```text
+# .env.example
+DATABASE_URL=postgres://realuser:realpass@prod-db.example/db
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for string literals and static fields used in authentication, signing, or outbound integration.
+
+### Python
+
+```python
+API_KEY = "sk_live_..."
+if password == "admin123":
+    login_admin()
+os.environ.setdefault("SECRET_KEY", "dev-only-key-in-git")
+```
+
+`settings.py` secrets; `cryptography` keys in `.py` files; pytest fixtures with prod URLs.
+
+### Java
+
+```java
+private static final String API_SECRET = "abc123";
+if (password.equals("backdoor")) { ... }
+String jdbc = "jdbc:mysql://user:pass@host/db";
+```
+
+`@Value("${hardcoded}")` with default in properties committed to git; Android `BuildConfig.API_KEY`.
+
+### C#
+
+```csharp
+const string ApiKey = "prod-key-xyz";
+var conn = "Server=.;Database=App;User Id=sa;Password=Secret;";
+```
+
+`appsettings.json` with passwords; `UserSecrets` mistakenly committed; Azure connection strings in repo.
+
+### JavaScript
+
+```javascript
+const STRIPE_SECRET = process.env.STRIPE || "sk_live_fallback";
+export const INTERNAL_TOKEN = "bearer-static-token";
+```
+
+Webpack `DefinePlugin` inlining secrets; Next.js `NEXT_PUBLIC_*` misused for server keys.
+
+### Go
+
+```go
+const hmacSecret = "hardcoded"
+db, _ := sql.Open("postgres", "postgres://user:pass@host/db")
+```
+
+### Shell and config artifacts
+
+```bash
+export AWS_SECRET_ACCESS_KEY=...
+curl -H "Authorization: Bearer sk-..." ...
+```
+
+Kubernetes Secrets in plain YAML in git; Terraform `variable` defaults with real passwords.
+
 ## Sample Vulnerable Code in Python
 
 ```python

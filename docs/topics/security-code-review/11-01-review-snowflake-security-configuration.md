@@ -33,6 +33,121 @@ The unsafe assumption is that warehouse isolation and object naming replace expl
 | **Data sharing** | Outbound shares to consumer accounts without column masking or secure views |
 | **Audit blind spots** | `ACCESS_HISTORY` not retained, login without client IP logging, no alert on privilege escalation |
 
+## Misconfiguration Examples
+
+Use these as review checklists when reading SQL migrations, Terraform, and account settings—not as instructions to apply in production.
+
+### Example 1: Open network policy
+
+```sql
+CREATE NETWORK POLICY open_policy
+  ALLOWED_IP_LIST = ('0.0.0.0/0');
+ALTER ACCOUNT SET NETWORK_POLICY = open_policy;
+```
+
+Any IPv4 address may attempt login—credential stuffing and brute force from the public internet.
+
+### Example 2: Service user with ACCOUNTADMIN
+
+```sql
+CREATE USER etl_service PASSWORD = 'S3rv1ceP@ssw0rd';
+GRANT ROLE ACCOUNTADMIN TO USER etl_service;
+```
+
+Compromise of one JDBC password yields full account control including shares and external stages.
+
+### Example 3: Future grant to broad role
+
+```sql
+GRANT SELECT ON FUTURE TABLES IN SCHEMA prod.public TO ROLE analyst_role;
+GRANT SELECT ON FUTURE TABLES IN SCHEMA prod.public TO ROLE PUBLIC;
+```
+
+Every new table inherits wide read access without per-table review.
+
+### Example 4: Outbound share of base PII table
+
+```sql
+CREATE SHARE customer_pii_share;
+GRANT SELECT ON TABLE prod.public.customers TO SHARE customer_pii_share;
+-- No secure view; SSN and email columns exposed to consumer account
+```
+
+### Example 5: Missing row access policy on multi-tenant table
+
+```sql
+CREATE TABLE prod.app.events (tenant_id VARCHAR, payload VARIANT);
+-- No CREATE ROW ACCESS POLICY; app role SELECT sees all tenants
+```
+
+## SDK/IaC Sinks and Dangerous Patterns
+
+Search Terraform, SQL migrations, and application code for these grant and connection patterns.
+
+### Snowflake SQL (GRANT / DDL sinks)
+
+```sql
+GRANT ROLE ACCOUNTADMIN TO USER app_svc;
+GRANT ALL PRIVILEGES ON DATABASE prod TO ROLE app_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA prod.public TO ROLE PUBLIC;
+CREATE USER svc PASSWORD = 'literal-in-migration';
+ALTER USER svc SET RSA_PUBLIC_KEY = NULL;  -- password-only service user
+CREATE SHARE external_share;
+GRANT SELECT ON TABLE prod.public.users TO SHARE external_share;
+```
+
+Also review: `GRANT OWNERSHIP`, `GRANT ROLE ... TO ROLE` (role hierarchy sprawl), `CREATE INTEGRATION` with broad storage URLs.
+
+### Python (snowflake-connector-python)
+
+```python
+snowflake.connector.connect(
+    user="app_svc", password="PlainTextInSource", role="ACCOUNTADMIN",
+    account="xy12345", warehouse="COMPUTE_WH",
+)
+cursor.execute(f"SELECT * FROM customers WHERE region = '{region}'")
+# Dynamic SQL bypasses row access policy session context
+```
+
+Also review: `write_pandas` with elevated role, `snowflake-sqlalchemy` connection strings in git.
+
+### Java (JDBC)
+
+```java
+String url = "jdbc:snowflake://xy12345.snowflakecomputing.com/?role=SYSADMIN&password=...";
+DriverManager.getConnection(url);
+stmt.executeQuery("SELECT * FROM " + userTable);  // identifier injection
+```
+
+Also review: Spring `application.yml` snowflake datasource, Flyway/Liquibase SQL with privileged grants.
+
+### Terraform (snowflake provider)
+
+```hcl
+resource "snowflake_user" "etl" {
+  password = "S3rv1ceP@ssw0rd"  # in state and git
+}
+resource "snowflake_role_grants" "bad" {
+  role_name = "ACCOUNTADMIN"
+  users     = [snowflake_user.etl.name]
+}
+resource "snowflake_share" "pii" {
+  accounts = ["CONSUMER.ACCOUNT"]
+}
+```
+
+Also review: `snowflake_grant`, `snowflake_network_policy` CIDR lists, provider `preview` features without review.
+
+### C# (Snowflake.Data)
+
+```csharp
+var connStr = "account=xy12345;user=app_svc;password=PlainText;role=SYSADMIN";
+new SnowflakeDbConnection(connStr);
+cmd.CommandText = $"SELECT * FROM orders WHERE id = {orderId}";
+```
+
+See [Snowflake connector for Python](https://docs.snowflake.com/en/developer-guide/python-connector/python-connector), [Snowflake JDBC](https://docs.snowflake.com/en/developer-guide/jdbc/jdbc), and [Terraform Snowflake provider](https://registry.terraform.io/providers/Snowflake-Labs/snowflake/latest/docs).
+
 ## Sample Vulnerable Configuration in Python
 
 Review IaC and CI scripts that apply Snowflake DDL. This policy-as-code check flags common grant anti-patterns before merge.

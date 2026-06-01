@@ -33,6 +33,117 @@ The unsafe assumption is that private VPC routing replaces encryption and author
 | **Weak auth** | `trust` or `md5` in `pg_hba.conf` for non-local connections |
 | **Logging gaps** | `log_connections` off in production; no audit extension for sensitive tables |
 
+## Misconfiguration Examples
+
+Use these when reviewing `postgresql.conf`, `pg_hba.conf`, SQL migrations, and datasource settings.
+
+### Example 1: Application superuser role
+
+```sql
+CREATE ROLE app_user LOGIN PASSWORD 'PlainTextInMigration' SUPERUSER CREATEDB;
+```
+
+Application compromise yields file read via `COPY ... PROGRAM`, extension install, and role alteration.
+
+### Example 2: Multi-tenant table without RLS
+
+```sql
+CREATE TABLE app.orders (
+  id bigserial PRIMARY KEY,
+  tenant_id uuid NOT NULL,
+  total numeric NOT NULL
+);
+-- Missing: ALTER TABLE app.orders ENABLE ROW LEVEL SECURITY;
+```
+
+Any session with `SELECT` on the table reads all tenants—ORM `WHERE` alone is not a security boundary.
+
+### Example 3: GRANT ALL to PUBLIC
+
+```sql
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO PUBLIC;
+```
+
+Every database role including low-privilege readers may write and truncate.
+
+### Example 4: trust authentication on wide CIDR
+
+```
+# pg_hba.conf
+host    all    all    0.0.0.0/0    trust
+```
+
+No password required from any reachable IPv4 address—catastrophic if port is exposed.
+
+### Example 5: SSL disabled in JDBC URL
+
+```properties
+spring.datasource.url=jdbc:postgresql://db.internal:5432/app?sslmode=disable
+```
+
+Credentials and result sets traverse the network in cleartext within the VPC.
+
+## SDK/IaC Sinks and Dangerous Patterns
+
+### PostgreSQL SQL (GRANT / role sinks)
+
+```sql
+CREATE ROLE ... SUPERUSER BYPASSRLS CREATEDB CREATEROLE;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO app_user;
+ALTER ROLE app_user CONNECTION LIMIT NULL;
+ALTER SYSTEM SET ssl TO off;
+CREATE USER svc PASSWORD 'literal';
+```
+
+Also review: `SECURITY DEFINER` functions without `SET search_path`, `COPY TO PROGRAM`, `pg_read_file` grants.
+
+### Python (psycopg / SQLAlchemy)
+
+```python
+psycopg.connect("postgresql://app:password@host/db?sslmode=disable")
+engine = create_engine(url)  # password in URL in git
+cursor.execute(f"SELECT * FROM orders WHERE tenant_id = '{tenant_id}'")
+# Missing: SET LOCAL app.tenant_id before queries when RLS depends on it
+```
+
+Also review: `asyncpg`, Django `DATABASES` dict with password, Alembic migrations creating superuser roles.
+
+### Java (JDBC / HikariCP)
+
+```java
+cfg.setJdbcUrl("jdbc:postgresql://db:5432/app?sslmode=disable");
+cfg.setPassword("PlainTextInMigration");
+cfg.setMaximumPoolSize(500);  // no CONNECTION LIMIT alignment
+jdbcTemplate.execute("SET LOCAL app.tenant_id = '" + tenantId + "'");  // injection risk
+```
+
+Also review: Flyway/Liquibase `CREATE ROLE` scripts, Spring `application.yml` committed passwords.
+
+### pg_hba.conf / postgresql.conf
+
+```
+host    all    all    10.0.0.0/8    md5
+host    all    all    0.0.0.0/0     trust
+ssl = off
+password_encryption = md5
+```
+
+Also review: `listen_addresses = '*'`, `row_security = off` session overrides.
+
+### C# (Npgsql)
+
+```csharp
+var connStr = "Host=db;Database=app;Username=app_user;Password=PlainText;SSL Mode=Disable";
+await using var conn = new NpgsqlConnection(connStr);
+// No SET app.tenant_id — relies on WHERE clause only
+var cmd = new NpgsqlCommand("SELECT * FROM orders WHERE tenant_id = @t", conn);
+```
+
+Also review: Entity Framework connection strings, Azure Database for PostgreSQL firewall `0.0.0.0`.
+
+See [PostgreSQL JDBC](https://jdbc.postgresql.org/documentation/use/), [psycopg3](https://www.psycopg.org/psycopg3/docs/), [Npgsql connection settings](https://www.npgsql.org/doc/connection-string-parameters.html), and [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
+
 ## Sample Vulnerable Configuration in Python
 
 Validate connection settings and migration SQL in CI before deploy.

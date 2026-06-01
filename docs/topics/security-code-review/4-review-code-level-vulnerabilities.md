@@ -24,13 +24,15 @@ Each vulnerability family below has its own standalone chapter. Every mini-chapt
 
 1. **What the flaw is** — definition and CWE mapping where applicable.
 2. **Vulnerability characteristics** — where the pattern appears in real codebases (features, sinks, weak controls).
-3. **Sample vulnerable code in Python** — one focused example to study first.
-4. **Step-by-step review walkthrough** — how to trace the flaw and why each step matters.
-5. **Risk impact analysis** — what can go wrong for users, data, and the business.
-6. **Vulnerable examples in other languages** — always **Java** and **C#** first; then, when applicable, **JavaScript**, **HTML**, and **Go**; then **SQL**, **Shell**, and **C**. The **Sample Vulnerable Code** section always uses **Python** for the primary walkthrough.
-7. **Fix: safer patterns and libraries** — real code using vetted APIs, with **Important** notes per language.
-8. **Verify during review** — evidence to collect before you file a finding.
-9. **Reference** — official documentation links for the libraries and standards cited in the fix section.
+3. **Attack payloads** (or abuse scenarios) — representative test patterns for authorized security testing.
+4. **Language-specific sinks and dangerous APIs** — per-language libraries, calls, and system interfaces to search for, each with a short code sample.
+5. **Sample vulnerable code in Python** — one focused example to study first.
+6. **Step-by-step review walkthrough** — how to trace the flaw and why each step matters.
+7. **Risk impact analysis** — what can go wrong for users, data, and the business.
+8. **Vulnerable examples in other languages** — always **Java** and **C#** first; then, when applicable, **JavaScript**, **HTML**, and **Go**; then **SQL**, **Shell**, and **C**. The **Sample Vulnerable Code** section always uses **Python** for the primary walkthrough.
+9. **Fix: safer patterns and libraries** — real code using vetted APIs, with **Important** notes per language.
+10. **Verify during review** — evidence to collect before you file a finding.
+11. **Reference** — official documentation links for the libraries and standards cited in the fix section.
 
 The archive article [Secure Coding in Practice](secure-coding-in-practice.md) remains available as background reading; mini-chapters do not link to it in their reference sections.
 

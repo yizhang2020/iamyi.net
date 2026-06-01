@@ -30,6 +30,109 @@ The unsafe assumption is that logs are internal and low risk. In practice, log p
 | **Missing positives** | No audit trail for login failure, lockout, or admin actions without storing secrets |
 | **Shipping risk** | Log aggregation to Splunk, CloudWatch, or ELK without redaction filters |
 
+## Attack Payloads
+
+These are abuse scenarios for what attackers or insiders may recover from logs—not payloads to send to the app. Use them to design log review checklists and redaction tests.
+
+### Pattern 1: Credential capture in application logs
+
+```text
+INFO login attempt user=admin password=Secret123!
+DEBUG auth body={"password":"x","token":"eyJ..."}
+```
+
+### Pattern 2: Token and session leakage
+
+```text
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Set-Cookie: session=deadbeef; Path=/
+API key validated: sk_live_abc123xyz
+```
+
+### Pattern 3: Payment and regulated data
+
+```text
+card=4111111111111111 cvv=123 exp=12/29
+ssn=123-45-6789
+```
+
+### Pattern 4: Log injection via user-controlled fields (secondary risk)
+
+```text
+username=admin%0aINFO Forged audit: admin logged in
+```
+
+Newline or forged severity in usernames may confuse parsers or SIEM rules.
+
+### Pattern 5: Exception and stack trace disclosure
+
+```text
+SQLException: connection failed for user 'dbadmin' password 'DbP@ss!' at jdbc:mysql://internal-db:3306/prod
+```
+
+### Pattern 6: Full request dumps in debug mode
+
+```text
+REQUEST_HEADERS={... Authorization: Bearer ... Cookie: session=...}
+REQUEST_BODY={"password":"..."}
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for log calls and serializers that include request objects, headers, or exception messages with user data.
+
+### Python
+
+```python
+logger.info("login %s %s", user, password)
+logger.debug("headers %s body %s", request.headers, request.get_data())
+app.logger.exception(e)  # may include SQL with secrets
+```
+
+`print(request.json)` in containers; structlog with unfiltered `request` dict.
+
+### Java
+
+```java
+log.info("token={}", accessToken);
+log.debug("request {}", request.toString());
+e.printStackTrace();  // stderr captured by log agents
+```
+
+Log4j/SLF4J MDC with full `Authorization` header; Spring `CommonsRequestLoggingFilter` without masking.
+
+### C#
+
+```csharp
+_logger.LogInformation("Password {Pwd}", password);
+_logger.LogDebug("Request {@Request}", request);
+```
+
+Serilog destructuring of entire request DTOs; `ILogger` with connection strings in messages.
+
+### JavaScript
+
+```javascript
+console.log("auth", req.headers.authorization, req.body);
+logger.info({ headers: req.headers, body: req.body });
+```
+
+Winston/Pino serializers that pass through `req` unchanged.
+
+### Go
+
+```go
+log.Printf("login user=%s pass=%s", user, pass)
+log.Printf("req=%+v", r)  // may dump Authorization header
+```
+
+### Access and infrastructure logs
+
+```text
+# nginx — full URI with secrets if clients use GET login
+GET /login?password=secret HTTP/1.1
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

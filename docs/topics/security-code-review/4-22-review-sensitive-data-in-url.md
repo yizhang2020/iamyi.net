@@ -30,6 +30,123 @@ The unsafe assumption is that HTTPS alone protects the data. Transport encryptio
 | **Weak controls** | `@app.route(..., methods=["GET", "POST"])` on login, `[FromQuery] password`, redirect URLs echoing credentials |
 | **Referrer leakage** | Pages with secrets in the URL linked from external sites without `Referrer-Policy` |
 
+## Attack Payloads
+
+Use these in authorized tests when secrets may appear in GET URLs, redirects, or Referer headers. Replace placeholders with your test values.
+
+### Pattern 1: Credentials in query string (login abuse scenario)
+
+```http
+GET /login?user=admin&password=Secret123! HTTP/1.1
+Host: app.example
+```
+
+The same request may be stored in proxy access logs, browser history, and analytics that capture full URIs.
+
+### Pattern 2: API key and bearer token in URL
+
+```http
+GET /api/report?api_key=sk_live_abc123 HTTP/1.1
+GET /download?access_token=eyJhbGciOiJIUzI1NiJ9... HTTP/1.1
+```
+
+### Pattern 3: Password reset and magic-link tokens
+
+```http
+GET /reset/confirm?token=8f3c2a1b9e7d4f6a HTTP/1.1
+GET /magic-login?session=deadbeefcafebabe HTTP/1.1
+```
+
+Shareable links and email clients may retain the full URL indefinitely.
+
+### Pattern 4: Redirect that echoes secrets
+
+```http
+HTTP/1.1 302 Found
+Location: /dashboard?token=eyJhbGciOiJIUzI1NiJ9...
+```
+
+### Pattern 5: Referer exfiltration to third party
+
+```html
+<a href="https://analytics.example/landing">Continue</a>
+```
+
+When the prior page URL is `https://app.example/home?token=SECRET`, the browser may send:
+
+```http
+Referer: https://app.example/home?token=SECRET
+```
+
+### Pattern 6: OAuth and SSO callback tokens in query
+
+```http
+GET /oauth/callback?code=AUTH_CODE&state=xyz HTTP/1.1
+GET /sso/callback?access_token=LONG_LIVED_TOKEN HTTP/1.1
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for bindings and builders that place secrets in the URL path or query string.
+
+### Python
+
+```python
+pwd = request.args.get("password")
+return redirect(f"/home?user={user}&token={token}")
+logger.info("login url=%s", request.url)  # full URI with query
+```
+
+Flask `request.url`, `request.full_path`; FastAPI `Query()` on sensitive fields; Django `request.GET["password"]`.
+
+### Java
+
+```java
+@GetMapping("/auth")
+public void auth(@RequestParam String password) { ... }
+
+resp.sendRedirect("/app?token=" + accessToken);
+String uri = req.getRequestURI() + "?" + req.getQueryString();
+log.info("request {}", uri);
+```
+
+Spring `@RequestParam` on GET login; servlet `getQueryString()` logged verbatim.
+
+### C#
+
+```csharp
+[HttpGet("auth")]
+public IActionResult Auth([FromQuery] string password) { ... }
+
+return Redirect($"/dashboard?token={accessToken}");
+_logger.LogInformation("Request {Url}", Request.GetDisplayUrl());
+```
+
+### JavaScript
+
+```javascript
+const token = new URLSearchParams(location.search).get("token");
+window.location = `/app?api_key=${apiKey}`;
+fetch(`/proxy?url=${encodeURIComponent(secretUrl)}`);
+```
+
+Front-end routers that sync tokens into `history.pushState` query params.
+
+### Go
+
+```go
+pass := r.URL.Query().Get("password")
+http.Redirect(w, r, "/home?token="+token, http.StatusFound)
+log.Printf("uri=%s", r.URL.String())
+```
+
+### Access and APM logging
+
+```text
+# nginx / load balancer access log line
+GET /login?password=Secret123! HTTP/1.1" 200
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

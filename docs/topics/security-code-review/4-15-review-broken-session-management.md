@@ -30,6 +30,106 @@ The unsafe assumption is that knowing the session ID is equivalent to proof of i
 | **Logout gaps** | Client-only cookie clear without server-side invalidation |
 | **Transport leaks** | Session IDs in URLs, logs, referrer headers, or analytics |
 
+## Abuse Scenarios
+
+Use these in authorized tests and code review. They show how weak session APIs let attackers fixate, hijack, or reuse sessions—not injection strings.
+
+### Pattern 1: Session fixation (pre-login ID accepted after auth)
+
+```text
+1. Attacker obtains SESSIONID=abc123 (unauthenticated).
+2. Victim logs in with that cookie; server keeps abc123.
+3. Attacker reuses abc123 as the authenticated victim.
+```
+
+### Pattern 2: Predictable or short session identifiers
+
+```text
+SESSIONID=100042
+session_id = str(uuid.uuid4())[:8]
+```
+
+### Pattern 3: Missing cookie security flags
+
+```http
+Set-Cookie: session=abc123; Path=/
+# Missing HttpOnly, Secure, appropriate SameSite
+```
+
+### Pattern 4: Logout without server invalidation
+
+```text
+Client deletes cookie; server session store still maps old ID → user.
+Captured ID remains valid until TTL expires.
+```
+
+### Pattern 5: Session ID in URL or referrer leak
+
+```text
+https://app.example/home?sessionid=abc123
+Referer: https://app.example/home?sessionid=abc123 → third-party analytics
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Trace session creation, cookie issuance, rotation at login, and invalidation at logout.
+
+### Python
+
+```python
+from flask import session
+session['user'] = username  # no regenerate after login
+resp.set_cookie('session', sid, httponly=False, secure=False, samesite='None')
+```
+
+Django: `request.session` without `cycle_key()` on login. Starlette: `SessionMiddleware` cookie flags.
+
+### Java
+
+```java
+HttpSession session = request.getSession(true);  // before authentication
+// login success — same session ID, no session.invalidate() + new session
+response.addCookie(new Cookie("JSESSIONID", session.getId()));
+```
+
+Servlet: `request.changeSessionId()` not called; `Cookie` without `HttpOnly`/`Secure`. Spring Session config.
+
+### C#
+
+```csharp
+HttpContext.Session.SetString("User", name);
+Response.Cookies.Append("SessionId", id);  // missing HttpOnly, Secure, SameSite
+```
+
+ASP.NET Core: `AddSession` without secure cookie options; Identity without sign-in cookie rotation.
+
+### JavaScript (Node.js)
+
+```javascript
+req.session.userId = id;  // express-session, no regenerate on login
+res.cookie('connect.sid', sid, { httpOnly: false });
+```
+
+`express-session`, `cookie-session`, Passport without `req.session.regenerate()`.
+
+### Go
+
+```go
+session.Values["user"] = username
+session.Save(r, w)  // same store ID before and after login
+http.SetCookie(w, &http.Cookie{Name: "session", Value: token, Secure: false})
+```
+
+Gorilla sessions, `scs` session manager—check `Session.Regenerate` on auth success.
+
+### PHP
+
+```php
+session_start();
+$_SESSION['user'] = $user;  // session_id() unchanged at login
+setcookie(session_name(), session_id(), 0, '/');  // no httponly/secure flags
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

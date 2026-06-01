@@ -30,6 +30,108 @@ The unsafe assumption is that short-lived files are private because they are del
 | **Cleanup gaps** | Delete only on happy path; `deleteOnExit` without guaranteed removal |
 | **Shared hosts** | Multi-tenant VMs, containers with shared `/tmp`, predictable PID-based names |
 
+## Attack Payloads
+
+Use these in authorized tests on shared hosts or containers with a writable `/tmp`. Abuse scenarios include guessing paths, symlink races, and reading world-readable exports.
+
+### Pattern 1: Predictable path guessing
+
+```text
+/tmp/export_12345.csv
+/tmp/app_upload_67890.pdf
+/var/tmp/report-{pid}.xml
+```
+
+Scan with the application's PID or session patterns when filenames are sequential or derived from `os.getpid()`.
+
+### Pattern 2: TOCTOU symlink race (abuse scenario)
+
+```bash
+# Attacker on shared host
+ln -s /etc/passwd /tmp/export_pending.csv
+# App checks exists(), then opens and writes sensitive export
+```
+
+### Pattern 3: World-readable sensitive export
+
+```bash
+ls -l /tmp/user_export.csv
+# -rw-r--r-- 1 app app 50000 ...  → other users can read
+```
+
+### Pattern 4: Stale temp files after crash
+
+```text
+/tmp/payment_receipt_abc123.pdf  # left for hours with PAN data
+```
+
+### Pattern 5: Predictable names in URLs
+
+```text
+GET /download?file=/tmp/session_42_export.zip
+```
+
+### Pattern 6: Container shared volume
+
+```text
+/tmp from host mounted into multiple pods — cross-tenant read if names collide
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for temp file creation without secure random names, `O_EXCL`, or restrictive permissions.
+
+### Python
+
+```python
+open(f"/tmp/upload_{user_id}.dat", "w")
+tempfile.mktemp(suffix=".csv")  # deprecated — predictable
+NamedTemporaryFile(delete=False)  # left on disk without cleanup
+os.chmod(path, 0o644)
+```
+
+`tempfile.mkstemp` is safer when used with `0600` and prompt `os.unlink`.
+
+### Java
+
+```java
+File f = new File("/tmp/export-" + userId + ".xml");
+File.createTempFile("report", ".pdf");  // default dir may be world-readable
+Files.write(path, data);  // no explicit PosixFilePermissions
+```
+
+`File.deleteOnExit()` without guaranteed removal on crash paths.
+
+### C#
+
+```csharp
+var path = Path.Combine(Path.GetTempPath(), $"export_{id}.csv");
+File.WriteAllText(path, sensitive);
+```
+
+`Path.GetTempFileName()` without ACL hardening on Windows.
+
+### JavaScript (Node.js)
+
+```javascript
+const p = `/tmp/${req.session.id}.json`;
+fs.writeFileSync(p, JSON.stringify(data));
+```
+
+### Go
+
+```go
+f, _ := os.Create(fmt.Sprintf("/tmp/out_%d", os.Getpid()))
+ioutil.WriteFile("/tmp/"+name, data, 0644)
+```
+
+### Shell
+
+```bash
+echo "$DATA" > /tmp/report.$$
+mktemp /tmp/upload.XXXXXX  # wrong if X not used
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

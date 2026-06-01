@@ -30,6 +30,117 @@ The unsafe assumption is that comments are private or harmless. In practice, com
 | **HTML exposure** | JSP, Thymeleaf, static HTML comments visible in page source |
 | **Commented-out code** | Disabled auth checks and hardcoded overrides left for debugging |
 
+## Attack Payloads
+
+Use repository search and page-source review—these are disclosure abuse scenarios, not network payloads.
+
+### Pattern 1: Credentials in source comments
+
+```python
+# TODO: remove before prod — admin password is 'Winter2024!'
+# API key for staging: sk_test_EXAMPLE_NOT_A_REAL_KEY_xxxxxxxx
+```
+
+### Pattern 2: Authentication bypass hints
+
+```java
+// HACK: set userId=0 in query to skip billing check
+// For QA only: header X-Debug: bypass-mfa
+```
+
+### Pattern 3: Internal topology in comments
+
+```text
+# Connects to prod-db.internal.corp:5432 / db=payments
+<!-- Legacy admin: https://10.0.0.5:8443/console -->
+```
+
+### Pattern 4: HTML comments visible in browser
+
+```html
+<!-- build 2024-03-01 internal token: BUILD_SECRET_abc -->
+```
+
+View-source or cached pages expose these to unauthenticated users.
+
+### Pattern 5: Commented-out security controls
+
+```csharp
+// if (!User.IsInRole("Admin")) return Forbid();
+// ValidateSignature(payload);  // disabled for demo
+```
+
+### Pattern 6: Javadoc and docstrings shipped to clients
+
+```text
+@param apiSecret the shared secret (currently "hunter2")
+```
+
+Generated API docs may publish comment text.
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search comments and doc blocks—these are not runtime sinks but disclosure surfaces that travel with builds.
+
+### Python
+
+```python
+"""Authenticate with service key sk_live_xxx."""
+# password = os.environ.get("PWD", "default-secret")
+```
+
+Module docstrings, `# noqa` blocks, Sphinx-generated HTML.
+
+### Java
+
+```java
+/** Test user: admin / Passw0rd! */
+// @deprecated use backdoor account "support" with pin 0000
+```
+
+Javadoc published to Maven sites; `//` in shipped JSP source.
+
+### C#
+
+```csharp
+/// <summary>Uses HMAC key: supersecretkey</summary>
+// TODO: re-enable [Authorize] after demo
+```
+
+XML doc comments in IntelliSense and NuGet packages.
+
+### JavaScript
+
+```javascript
+// STRIPE_SECRET=sk_live_...
+/* FIXME: remove auth check for /api/internal */
+```
+
+Bundled source maps may retain comments; `/*!` license blocks with keys.
+
+### HTML / templates
+
+```html
+<!-- admin:admin@internal.vpn -->
+```
+
+Thymeleaf `<!--/* ... */-->`, JSP comments in rendered output.
+
+### Go
+
+```go
+// dbURL := "postgres://user:pass@host/db"
+```
+
+Godoc pages from exported packages.
+
+### Search patterns for review
+
+```text
+password|passwd|secret|api[_-]?key|token|bearer|sk_live|AKIA
+TODO|FIXME|HACK|XXX|backdoor|bypass|disable.*auth
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

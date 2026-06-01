@@ -35,6 +35,105 @@ This aligns with [OpenID Connect Core 1.0](https://openid.net/specs/openid-conne
 | **UserInfo** | Bearer access token sent over HTTP, UserInfo trusted when `id_token` already invalid or absent |
 | **Hybrid / implicit** | `id_token` returned in URL fragment without strict validation and short lifetime |
 
+## Abuse Scenarios
+
+Use these scenarios when reviewing OIDC login, account linking, and API authorization that trusts identity claims.
+
+### Scenario 1: Forged id_token (signature not verified)
+
+The application base64-decodes the JWT payload or calls `jwt.decode(..., verify_signature=False)`. An attacker crafts an `id_token` with `sub` of a victim admin and `email` of their choice. The app creates a session without contacting the IdP.
+
+### Scenario 2: Token replay across clients (audience mismatch)
+
+The validator checks signature but not `aud`. An attacker obtains an `id_token` minted for a low-privilege mobile client and replays it to a high-privilege web API that accepts the same issuer.
+
+### Scenario 3: Missing nonce (session fixation)
+
+The authorize request omits `nonce`. An attacker completes IdP login in their browser, then delivers their `id_token` (via hybrid flow fragment or phishing) to bind their IdP identity to the victim's application session.
+
+### Scenario 4: UserInfo as primary identity
+
+The app skips `id_token` validation and calls UserInfo with any bearer token. An attacker presents a stolen API access token (wrong audience) or a token from another client with overlapping scopes.
+
+### Scenario 5: Issuer confusion (multi-tenant)
+
+The app accepts any `iss` matching a substring or loads metadata from attacker-supplied issuer URLs in self-service tenant config. Attacker-operated IdP mints valid-looking tokens for their keys.
+
+### Scenario 6: MITM on discovery/JWKS fetch
+
+TLS verification is disabled when fetching `.well-known/openid-configuration` or JWKS. Attacker serves attacker-controlled keys; signatures verify against wrong trust anchor.
+
+## Language-Specific Libraries and Dangerous Patterns
+
+### Python
+
+```python
+# Dangerous
+claims = jwt.decode(id_token, options={"verify_signature": False})
+userinfo = requests.get(f"{ISSUER}/userinfo", verify=False, headers={...})
+
+# Safer: Authlib parse_id_token after authorize_access_token
+from authlib.integrations.flask_client import OAuth
+token = oauth.idp.authorize_access_token()
+userinfo = oauth.idp.parse_id_token(token, nonce=session.pop("oidc_nonce"))
+```
+
+Also review: `python-jose` without `issuer`/`audience`, manual JWKS fetch without `kid` rotation handling.
+
+### Java
+
+```java
+// Dangerous: parse without validation
+SignedJWT.parse(raw).getJWTClaimsSet();
+
+// Safer: Nimbus IDTokenValidator or Spring OAuth2 Login (issuer-uri)
+IDTokenValidator validator = new IDTokenValidator(
+    new Issuer("https://idp.example.com"), new ClientID("web-app"),
+    JWSAlgorithm.RS256, jwkSource);
+IDTokenClaimsSet claims = validator.validate(idToken, nonce);
+```
+
+Also review: `jjwt` without `requireIssuer`, Spring `@AuthenticationPrincipal OidcUser` bypassed by custom parsers.
+
+### C#
+
+```csharp
+// Dangerous
+var token = handler.ReadJwtToken(id_token);
+
+// Safer: AddOpenIdConnect middleware + TokenValidationParameters
+options.Authority = "https://idp.example.com";
+options.TokenValidationParameters.ValidateAudience = true;
+options.TokenValidationParameters.ValidAudience = clientId;
+```
+
+Also review: `Microsoft.IdentityModel.Protocols.OpenIdConnect`, MSAL `ValidateAuthority`.
+
+### JavaScript
+
+```javascript
+// Dangerous: client-side id_token parsing
+const payload = JSON.parse(atob(idToken.split('.')[1]));
+
+// Safer: backend-only code flow; openid-client validateIdToken()
+import * as client from 'openid-client';
+const claims = client.validateIdToken(idToken, expectedNonce, clientMetadata, jwks);
+```
+
+### Go
+
+```go
+// Dangerous
+token, _, _ := new(jwt.Parser).ParseUnverified(rawIDToken, jwt.MapClaims{})
+
+// Safer: coreos/go-oidc
+provider, _ := oidc.NewProvider(ctx, "https://idp.example.com")
+verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
+idToken, err := verifier.Verify(ctx, rawIDToken)
+```
+
+See [Authlib OpenID Connect](https://docs.authlib.org/en/latest/client/flask.html#openid-connect-support), [Nimbus OIDC SDK](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk), [Microsoft.IdentityModel](https://learn.microsoft.com/en-us/entra/identity-platform/id-tokens), and [coreos/go-oidc](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc).
+
 ## Sample Vulnerable Code in Python
 
 ```python

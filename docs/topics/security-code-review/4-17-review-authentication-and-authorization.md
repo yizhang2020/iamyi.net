@@ -30,6 +30,123 @@ The unsafe assumption is that knowing a valid session or API key implies permiss
 | **Implicit public** | `permitAll`, `[AllowAnonymous]`, missing middleware on `/internal` paths |
 | **Service bypass** | Message consumers and schedulers calling repositories without authorization |
 
+## Abuse Scenarios
+
+Use these patterns in authorized tests and static review. They show missing authorization logic—not crafted injection strings.
+
+### Pattern 1: Authenticated but no ownership check (horizontal)
+
+```http
+GET /api/document/1001 HTTP/1.1
+Cookie: session=victim
+# Change 1001 → 1002; same 200 OK and other user's data
+```
+
+### Pattern 2: Admin route with login-only guard (vertical)
+
+```http
+POST /admin/settings HTTP/1.1
+Cookie: session=standard_user
+# No role check — config updated
+```
+
+### Pattern 3: Client-trusted role claim
+
+```json
+{"userId": 42, "isAdmin": true, "role": "admin"}
+```
+
+Server maps permissions from body or unverified JWT claim without server-side role lookup.
+
+### Pattern 4: Implicit public or `permitAll` gap
+
+```text
+GET /internal/export  → 200 without authentication
+POST /api/v2/refund  → no @PreAuthorize while v1 is protected
+```
+
+### Pattern 5: Background job inherits no principal
+
+```text
+Message: {"action":"delete_user","targetUserId":99}
+Consumer calls repository.delete(id) with no caller context check
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Every sensitive handler should call an authorization check before loading or mutating data.
+
+### Python
+
+```python
+@app.route("/api/document/<doc_id>")
+def get_document(doc_id):
+    return db.documents.find_one({"_id": doc_id})  # no owner filter
+
+if request.json.get("is_admin"):
+    grant_admin()
+```
+
+Flask/Django: views with auth decorator but no object-level check. DRF: `IsAuthenticated` without `has_object_permission`.
+
+### Java
+
+```java
+@GetMapping("/orders/{id}")
+public Order get(@PathVariable Long id) {
+    return orderRepo.findById(id).orElseThrow();
+}
+
+@PreAuthorize("isAuthenticated()")  // not hasRole('ADMIN')
+@PostMapping("/admin/config")
+```
+
+Spring: missing `@PreAuthorize`, `hasPermission`, or method security on service layer. JAX-RS: `@RolesAllowed` omitted.
+
+### C#
+
+```csharp
+[Authorize]
+public IActionResult GetInvoice(int id) =>
+    Ok(_db.Invoices.Find(id));  // no policy for owner
+
+[AllowAnonymous]
+public IActionResult InternalHealth() => Ok(secrets);
+```
+
+ASP.NET: `[Authorize]` without resource-based policy; `[AllowAnonymous]` on sensitive controllers.
+
+### JavaScript (Node.js)
+
+```javascript
+app.get('/api/users/:id', requireAuth, (req, res) => {
+  return User.findById(req.params.id);  // no req.user.id === id
+});
+if (req.body.role === 'admin') await promoteUser(req.body.userId);
+```
+
+Express middleware that only checks JWT presence; GraphQL resolvers without field-level authz.
+
+### Go
+
+```go
+func GetOrder(w http.ResponseWriter, r *http.Request) {
+    id := mux.Vars(r)["id"]
+    order, _ := repo.FindByID(id)  // no principal scope
+}
+```
+
+Chi/gin handlers with authentication middleware but no `authorize(user, resource)` call.
+
+### PHP
+
+```php
+$doc = Document::find($_GET['id']);  // logged in, not owner
+if ($_POST['admin']) { makeAdmin($_POST['user_id']); }
+```
+
+Laravel: `auth` middleware without `$this->authorize()` or policy on model.
+
 ## Sample Vulnerable Code in Python
 
 ```python

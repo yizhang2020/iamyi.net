@@ -31,6 +31,119 @@ The unsafe assumption is that obscurity or simplicity equals security. Hashing v
 | **Hash vs encrypt confusion** | Reversible password "encryption," symmetric ciphers used for credential storage |
 | **TLS bypass** | `InsecureSkipVerify`, disabled hostname checks, legacy protocol enablement |
 
+## Attack Payloads
+
+Use these in authorized offline tests against password hashes, tokens, and custom "encryption" helpers—not live brute-force against production without approval.
+
+### Pattern 1: Weak password hash cracking
+
+```text
+# MD5('password') = 5f4dcc3b5aa765d61d8327deb882cf99
+# SHA-1('password') = 5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8
+# Rainbow tables and hashcat recover unsalted digests in seconds
+```
+
+### Pattern 2: Predictable token guessing
+
+```text
+# Token derived from Math.random(), time(), or sequential counters
+session=5f4dcc3b5aa765d61d8327deb882cf99
+session=1704067200
+session=00000001, 00000002, ...
+```
+
+### Pattern 3: ECB block manipulation
+
+```text
+# Identical plaintext blocks produce identical ciphertext blocks
+# Attacker may swap blocks or infer structure in repeated-field messages
+```
+
+### Pattern 4: XOR key recovery (known plaintext)
+
+```text
+# If attacker knows plaintext prefix (e.g. JSON {"role":")
+# XOR ciphertext with known bytes to recover key bytes for that position
+```
+
+### Pattern 5: Static IV / nonce reuse
+
+```text
+# GCM nonce reuse with same key leaks authentication key and plaintext XOR
+# Reused IV in CBC enables pattern analysis across messages
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+### Python
+
+```python
+hashlib.md5(password.encode()).hexdigest()
+hashlib.sha1(password.encode()).hexdigest()
+hashlib.sha256(password.encode()).hexdigest()  # single round, no salt
+random.random()  # token generation
+random.randint(0, 2**32)
+from Crypto.Cipher import AES; AES.new(key, AES.MODE_ECB)
+bytes(a ^ b for a, b in zip(data, key))  # custom XOR
+Fernet(key) with hardcoded key in source
+requests.get(url, verify=False)
+```
+
+Also review: `passlib` misconfiguration, `hmac.new` with weak key, `uuid.uuid4()` mistaken for crypto-strength session IDs.
+
+### Java
+
+```java
+MessageDigest.getInstance("MD5");
+MessageDigest.getInstance("SHA-1");
+Cipher.getInstance("DES/ECB/PKCS5Padding");
+Cipher.getInstance("AES/ECB/PKCS5Padding");
+new SecureRandom(); // not used — Math.random() for tokens instead
+DigestUtils.md5Hex(password);
+TrustManager that accepts all certificates
+```
+
+### C#
+
+```csharp
+MD5.Create().ComputeHash(passwordBytes);
+SHA256.Create().ComputeHash(passwordBytes);  // no salt, no work factor
+Aes.Create(); aes.Mode = CipherMode.ECB;
+Random().Next() for session tokens
+Guid.NewGuid() as auth token without additional entropy
+ServicePointManager.ServerCertificateValidationCallback = (_, _, _, _) => true;
+```
+
+### C
+
+```c
+MD5(password, len, digest);
+DES_encrypt(...);
+rand() for session tokens;
+srand(time(NULL));
+XOR loop labeled "encrypt";
+SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+```
+
+### Go
+
+```go
+md5.Sum([]byte(pw))
+sha1.Sum([]byte(pw))
+aes.NewCipher(key) // ECB-style manual loop
+math/rand for tokens
+crypto/tls.Config{InsecureSkipVerify: true}
+```
+
+### JavaScript
+
+```javascript
+crypto.createHash('md5').update(password).digest('hex');
+Math.random().toString(36);  // session token
+CryptoJS.AES.encrypt(data, passphrase);  // weak KDF defaults if misused
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python

