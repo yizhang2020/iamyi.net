@@ -137,28 +137,28 @@ Resolvers must authorize the node, not only require a valid session.
 
 ```python
 import os
-from flask import Flask, request, jsonify, send_file, session
+from django.http import FileResponse, JsonResponse
+from django.views.decorators.http import require_GET
 
-app = Flask(__name__)
+@require_GET
+def invoice_detail(request, invoice_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "login required"}, status=401)
+    # Authenticated but no owner filter — ID swap exposes other tenants' invoices
+    inv = Invoice.objects.get(pk=invoice_id)
+    return JsonResponse({"id": inv.id, "total": inv.total, "customer": inv.customer_email})
 
-@app.route("/api/orders/<order_id>")
-def get_order(order_id):
-    if "user_id" not in session:
-        return "", 401
-    # Authenticated but no owner filter — ID swap exposes other users' orders
-    order = db.orders.find_one({"_id": order_id})
-    return jsonify(order)
-
-@app.route("/files")
-def download():
-    name = request.args.get("name")
-    return send_file(os.path.join("/uploads", name))
+@require_GET
+def attachment_download(request):
+    key = request.GET.get("key")
+    # User-supplied storage key without ACL check
+    return FileResponse(open(os.path.join("/data/attachments", key), "rb"))
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **List parameters that select objects.** Path variables, query strings, JSON fields, and hidden form inputs.
-2. **Trace from parameter to persistence.** SQL `WHERE id = ?`, S3 keys, filesystem paths, and cache keys.
+2. **Trace the Django invoice handler.** In the sample, authenticated users can swap `invoice_id` without an owner predicate. Every object lookup needs principal scope.
 3. **Locate authorization between lookup and response.** Compare resource `ownerId`, `tenantId`, or ACL to current user.
 4. **Review bulk and export endpoints.** Arrays of IDs need per-item checks, not only batch existence.
 5. **Check indirect references.** Download tokens, signed URLs, and GraphQL node IDs that decode to internal keys.

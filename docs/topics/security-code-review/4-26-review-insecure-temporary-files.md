@@ -136,19 +136,21 @@ mktemp /tmp/upload.XXXXXX  # wrong if X not used
 
 ```python
 import os
+import uuid
 
-def write_report(secret_report: str) -> str:
-    # Predictable path under shared /tmp — readable by other local users
-    temp_file = f"/tmp/tempfile_{os.getpid()}.txt"
-    with open(temp_file, "w") as f:
-        f.write(secret_report)
+def write_payout_export(rows: list[str]) -> str:
+    # Predictable name under shared /tmp — readable by other local users
+    export_name = f"payout_{uuid.uuid4().hex[:6]}.csv"
+    temp_file = os.path.join("/tmp", export_name)
+    with open(temp_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(rows))
     return temp_file
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for hardcoded temp paths.** Look for `/tmp/`, `temporary.txt`, and PID-only filename patterns.
-2. **Trace the Python report writer.** In the sample, PID-based names are guessable on shared hosts. Use `tempfile` APIs instead.
+2. **Trace the payout export writer.** In the sample, short UUID prefixes under shared `/tmp` remain guessable on multi-tenant hosts.
 3. **Compare create APIs.** Prefer `tempfile.mkstemp` or `NamedTemporaryFile` over manual path construction.
 4. **Check for TOCTOU.** Existence checks followed by separate opens create a race on shared directories.
 5. **Review permissions after create.** Set owner-read/write only on Unix when defaults are loose.

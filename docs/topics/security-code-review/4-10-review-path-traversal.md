@@ -37,47 +37,47 @@ Use these in authorized tests when a parameter influences filesystem paths. Repl
 ### Pattern 1: Basic parent-directory traversal
 
 ```text
-FILE=../../../etc/passwd
-FILE=....//....//etc/passwd
-FILE=..\\..\\..\\windows\\win.ini
+AVATAR=../../../etc/shadow
+AVATAR=....//....//var/log/auth.log
+AVATAR=..\\..\\..\\windows\\system32\\config\\sam
 ```
 
 ### Pattern 2: URL-encoded and double-encoded sequences
 
 ```text
-FILE=..%2f..%2f..%2fetc%2fpasswd
-FILE=..%252f..%252f..%252fetc%252fpasswd
-FILE=%2e%2e%2f%2e%2e%2fetc%2fpasswd
+AVATAR=..%2f..%2f..%2fvar%2flog%2fnginx%2faccess.log
+AVATAR=..%252f..%252f..%252fetc%252fshadow
+AVATAR=%2e%2e%2f%2e%2e%2fetc%2fhostname
 ```
 
 ### Pattern 3: Absolute path bypass
 
 ```text
-FILE=/etc/passwd
-FILE=C:\Windows\win.ini
-FILE=file:///etc/passwd
+AVATAR=/var/log/app.log
+AVATAR=C:\inetpub\logs\LogFiles\W3SVC1\u_ex.log
+AVATAR=file:///etc/hosts
 ```
 
 ### Pattern 4: Null byte truncation (legacy)
 
 ```text
-FILE=../../../etc/passwd%00.jpg
-FILE=secret.txt%00.png
+AVATAR=../../../etc/passwd%00.png
+AVATAR=backup.sql%00.jpg
 ```
 
 ### Pattern 5: Archive entry names (zip slip)
 
 ```text
-../../../../tmp/evil.sh
-..\\..\\..\\AppData\\Roaming\\startup\\backdoor.bat
+../../../../home/deploy/.ssh/authorized_keys
+..\\..\\..\\Startup\\malware.bat
 ```
 
 ### Pattern 6: Unicode and normalization bypass
 
 ```text
-FILE=..%c0%af..%c0%afetc/passwd
-FILE=....\/....\/etc/passwd
-FILE=..%ef%bc%8f..%ef%bc%8fetc/passwd
+AVATAR=..%c0%af..%c0%afetc/passwd
+AVATAR=....\/....\/etc/hosts
+AVATAR=..%ef%bc%8f..%ef%bc%8fvar/log/syslog
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -87,11 +87,11 @@ Search for path concatenation without canonicalization and base-directory checks
 ### Python
 
 ```python
-open(f"/var/www/uploads/{filename}")
-send_file(os.path.join(BASE, user_file))
-Path(base_dir) / request.args.get("name")
+open(f"/var/www/avatars/{user_id}/{filename}")
+send_file(os.path.join(AVATAR_ROOT, avatar_name))
+Path(log_dir) / request.args.get("name")
 shutil.copy(user_path, dest)
-zipfile.extractall(user_upload)  # no per-entry validation
+tarfile.extractall(user_upload)  # no per-entry validation
 ```
 
 ### Java
@@ -151,18 +151,19 @@ from flask import Flask, request, send_file
 
 app = Flask(__name__)
 
-@app.route("/get_file")
-def get_file():
-    # Attacker-controlled filename — may contain ../ sequences
-    filename = request.args.get("filename")
+@app.route("/avatar")
+def serve_avatar():
+    # Attacker-controlled avatar filename — may contain ../ sequences
+    avatar = request.args.get("name")
+    user_id = request.args.get("uid")
     # Sink: path built without canonicalization or root check
-    return send_file(f"/var/www/uploads/{filename}")
+    return send_file(f"/var/www/avatars/{user_id}/{avatar}")
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find file I/O endpoints.** Search for download, upload, delete, and archive extract handlers that accept names or paths.
-2. **Trace the Python (or equivalent) input path.** In the sample, `filename` is concatenated into an absolute path. Ask whether `../../etc/passwd` resolves outside `/var/www/uploads`.
+2. **Trace the Python (or equivalent) input path.** In the sample, `avatar` is concatenated into a user-specific path. Ask whether `../../etc/passwd` resolves outside `/var/www/avatars/{user_id}`.
 3. **Inspect normalization.** Check for `resolve()`, `getCanonicalPath()`, `filepath.Clean()`, and whether results are compared to a trusted root prefix.
 4. **Review weak filters.** Blocking only `..` substring may miss `....//`, URL encoding, Unicode separators, or absolute paths.
 5. **Follow indirect paths.** Database-stored filenames and attachment IDs mapped to paths need the same root check.
@@ -186,9 +187,9 @@ def get_file():
 ```java
 @Override
 protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-    String filename = req.getParameter("filename");
-    String basePath = req.getServletContext().getRealPath("avatar");
-    Path path = Paths.get(basePath, filename);
+    String logName = req.getParameter("log");
+    String basePath = req.getServletContext().getRealPath("logs");
+    Path path = Paths.get(basePath, logName);
     File file = path.toAbsolutePath().toFile();
     if (!file.exists()) {
         resp.setStatus(404);
@@ -203,23 +204,24 @@ protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IO
 ### C#
 
 ```csharp
-[HttpGet("download")]
-public IActionResult Download(string file)
+[HttpGet("invoices/{id}/pdf")]
+public IActionResult DownloadInvoicePdf(int id, string template)
 {
-    var path = Path.Combine(_uploadRoot, file);
+    var path = Path.Combine(_invoiceRoot, id.ToString(), template);
     if (!System.IO.File.Exists(path))
         return NotFound();
     var bytes = System.IO.File.ReadAllBytes(path);
-    return File(bytes, "application/octet-stream", Path.GetFileName(path));
+    return File(bytes, "application/pdf", Path.GetFileName(path));
 }
 ```
 
 ### Go
 
 ```go
-func download(w http.ResponseWriter, r *http.Request) {
-    file := r.URL.Query().Get("file")
-    path := filepath.Join("/var/www/uploads", file)
+func serveAvatar(w http.ResponseWriter, r *http.Request) {
+    avatar := r.URL.Query().Get("name")
+    uid := r.URL.Query().Get("uid")
+    path := filepath.Join("/var/www/avatars", uid, avatar)
     http.ServeFile(w, r, path)
 }
 ```
@@ -234,17 +236,18 @@ Resolve paths and verify they stay under the upload root. Prefer framework helpe
 from pathlib import Path
 from flask import send_from_directory
 
-UPLOAD_ROOT = Path("/var/www/uploads").resolve()
+AVATAR_ROOT = Path("/var/www/avatars").resolve()
 
-@app.route("/get_file")
-def get_file():
-    filename = request.args.get("filename", "")
-    safe_path = (UPLOAD_ROOT / Path(filename).name).resolve()
-    if not safe_path.is_relative_to(UPLOAD_ROOT):
+@app.route("/avatar")
+def serve_avatar():
+    avatar = request.args.get("name", "")
+    uid = request.args.get("uid", "")
+    safe_path = (AVATAR_ROOT / uid / Path(avatar).name).resolve()
+    if not safe_path.is_relative_to(AVATAR_ROOT):
         return "Forbidden", 403
     if not safe_path.is_file():
         return "Not found", 404
-    return send_from_directory(UPLOAD_ROOT, safe_path.name)
+    return send_from_directory(safe_path.parent, safe_path.name)
 ```
 
 ```python
@@ -262,8 +265,8 @@ if path is None:
 Normalize and verify the resolved path starts with the base directory.
 
 ```java
-Path base = Paths.get("/var/www/uploads").toAbsolutePath().normalize();
-Path resolved = base.resolve(Paths.get(filename).getFileName()).normalize();
+Path base = Paths.get("/var/www/avatars").toAbsolutePath().normalize();
+Path resolved = base.resolve(uid).resolve(Paths.get(avatar).getFileName()).normalize();
 if (!resolved.startsWith(base) || !Files.isRegularFile(resolved)) {
     throw new ResponseStatusException(HttpStatus.NOT_FOUND);
 }
@@ -277,13 +280,13 @@ Files.copy(resolved, response.getOutputStream());
 Use `Path.GetFullPath` with a prefix check. Strip directory segments from user input.
 
 ```csharp
-var safeName = Path.GetFileName(file);
-var fullPath = Path.GetFullPath(Path.Combine(_uploadRoot, safeName));
-if (!fullPath.StartsWith(_uploadRoot, StringComparison.OrdinalIgnoreCase))
+var safeName = Path.GetFileName(template);
+var fullPath = Path.GetFullPath(Path.Combine(_invoiceRoot, id.ToString(), safeName));
+if (!fullPath.StartsWith(_invoiceRoot, StringComparison.OrdinalIgnoreCase))
     return Forbid();
 if (!System.IO.File.Exists(fullPath))
     return NotFound();
-return PhysicalFile(fullPath, "application/octet-stream", safeName);
+return PhysicalFile(fullPath, "application/pdf", safeName);
 ```
 
 **Important:** Reject rooted paths. `Path.IsPathRooted(userInput)` should fail for untrusted filenames.
@@ -293,9 +296,10 @@ return PhysicalFile(fullPath, "application/octet-stream", safeName);
 Clean paths and verify prefix under root. Prefer `http.Dir` or `embed.FS`.
 
 ```go
-func download(w http.ResponseWriter, r *http.Request) {
-    name := filepath.Base(r.URL.Query().Get("file"))
-    root := "/var/www/uploads"
+func serveAvatar(w http.ResponseWriter, r *http.Request) {
+    name := filepath.Base(r.URL.Query().Get("name"))
+    uid := filepath.Base(r.URL.Query().Get("uid"))
+    root := filepath.Join("/var/www/avatars", uid)
     clean := filepath.Clean(filepath.Join(root, name))
     if !strings.HasPrefix(clean, root+string(os.PathSeparator)) && clean != root {
         http.Error(w, "forbidden", http.StatusForbidden)

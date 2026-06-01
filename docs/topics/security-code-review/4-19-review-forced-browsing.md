@@ -146,20 +146,19 @@ location ~ /\. { }    # dotfiles accidentally exposed
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, session, redirect, render_template, jsonify
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
-app = Flask(__name__)
+router = APIRouter()
 
-@app.route("/admin/users")
-def admin_users():
-    # Only checks login, not admin role — any authenticated user lists all users
-    if "user" in session:
-        return render_template("admin_users.html", users=db.all_users())
-    return redirect("/login")
+@router.get("/ops/users")
+async def ops_users(user=Depends(require_login)):
+    # Only checks login, not ops role — any authenticated user lists all users
+    return JSONResponse({"users": await db.fetch_all_users()})
 
-@app.route("/internal/health/detailed")
-def detailed_health():
-    return jsonify({"db": DB_PASSWORD, "queue": QUEUE_URL})
+@router.get("/internal/metrics/raw")
+async def raw_metrics():
+    return JSONResponse({"db_dsn": DB_DSN, "queue": QUEUE_URL})
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -254,14 +253,14 @@ def roles_required(*roles):
         return wrapped
     return decorator
 
-@app.route("/admin/users")
+@app.get("/ops/users")
 @login_required
-@roles_required("admin")
-def admin_users():
-    return render_template("admin_users.html", users=db.all_users())
+@roles_required("ops")
+def ops_users():
+    return {"users": db.fetch_all_users()}
 
-# FastAPI: mount admin router with dependency
-admin_router = APIRouter(prefix="/admin", dependencies=[Depends(require_role("admin"))])
+# FastAPI: mount ops router with dependency
+ops_router = APIRouter(prefix="/ops", dependencies=[Depends(require_role("ops"))])
 ```
 
 **Important:** Use Django `permission_required("auth.view_user")` on class-based admin views. Gate internal routes with environment settings.

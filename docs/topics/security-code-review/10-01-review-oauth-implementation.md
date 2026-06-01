@@ -86,7 +86,20 @@ oauth.register(
 return oauth.idp.authorize_redirect(redirect_uri=FIXED_REDIRECT, state=state, code_challenge=challenge)
 ```
 
-Also review: `authlib` token exchange, `requests-oauthlib` without PKCE, `httpx` with `verify=False` on token URL.
+Also review: `authlib` token exchange, `requests-oauthlib` OAuth2Session without PKCE, `httpx-oauth` with `verify=False` on token URL.
+
+### Ruby
+
+```ruby
+# Dangerous: omniauth without state/PKCE; token in session
+OmniAuth.config.allowed_request_methods = [:post, :get]
+
+# Safer: omniauth-oauth2 with PKCE and fixed redirect
+provider :oidc,
+  scope: [:openid, :profile],
+  pkce: true,
+  redirect_uri: "https://app.example.com/auth/callback"
+```
 
 ### Java
 

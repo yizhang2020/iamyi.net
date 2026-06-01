@@ -40,7 +40,7 @@ Use these in authorized tests when user input appears in log messages or when re
 ```text
 username=admin%0aINFO User admin logged out successfully
 username=legit%0d%0aERROR Security audit: privilege escalation approved
-event=login%0a2024-01-01 INFO admin granted superuser
+event=checkout%0a2024-06-01 WARN refund approved txn=99999 amount=50000
 ```
 
 Forged newlines may confuse operators or SIEM parsers that treat each line as a separate event.

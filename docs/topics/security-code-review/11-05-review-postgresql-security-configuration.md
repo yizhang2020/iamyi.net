@@ -275,10 +275,12 @@ var cmd = new NpgsqlCommand("SELECT * FROM orders WHERE tenant_id = @t", conn);
 Separate admin and application roles; enable RLS; set connection limits; require SSL at the server per [PostgreSQL SSL documentation](https://www.postgresql.org/docs/current/ssl-tcp.html) and [row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
 
 ```sql
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA app REVOKE ALL ON TABLES FROM PUBLIC;
+
 CREATE ROLE app_migrator NOLOGIN;
 CREATE ROLE app_user LOGIN PASSWORD NULL CONNECTION LIMIT 50;
-GRANT USAGE ON SCHEMA app TO app_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO app_user;
+GRANT app_migrator TO app_user;
 
 CREATE TABLE app.orders (
   id bigserial PRIMARY KEY,
@@ -289,10 +291,14 @@ CREATE TABLE app.orders (
 ALTER TABLE app.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.orders FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY tenant_isolation ON app.orders
-  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+CREATE POLICY tenant_orders ON app.orders
+  FOR ALL TO app_user
+  USING (tenant_id = current_setting('app.tenant_id', true)::uuid);
 
--- postgresql.conf: ssl=on; pg_hba.conf uses hostssl + scram-sha-256 only
+ALTER ROLE app_user SET search_path = app, pg_catalog;
+
+-- postgresql.conf: ssl=on
+-- pg_hba.conf: hostssl all all 10.0.0.0/8 scram-sha-256
 ```
 
 **Important:** Application must `SET app.tenant_id` (or use `SET LOCAL` in a transaction) on each request before queries. RLS is the authoritative gate—not only ORM filters.

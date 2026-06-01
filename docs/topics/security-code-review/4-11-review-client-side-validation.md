@@ -37,26 +37,26 @@ Use these in authorized tests to bypass client-only checks. Send requests direct
 ### Pattern 1: Omit or tamper with hidden/trusted fields
 
 ```json
-{"quantity":1,"unit_price":0.01,"role":"admin","user_id":999}
-{"discount":100,"coupon":"INTERNAL_ONLY","is_verified":true}
+{"card_number":"4111111111111111","amount":0.01,"tier":"enterprise","account_id":999}
+{"gift_code":"INTERNAL","balance":99999,"is_verified":true}
 ```
 
 ### Pattern 2: Type and range violations
 
 ```json
-{"quantity":-5}
-{"amount":99999999999}
-{"age":-1}
-{"email":"not-an-email"}
+{"months":-12}
+{"gift_amount":99999999999}
+{"pin":"abc"}
+{"recipient_email":"not-an-email"}
 ```
 
 ### Pattern 3: Bypass HTML5 constraints
 
 ```http
-POST /checkout HTTP/1.1
+POST /gift-cards/redeem HTTP/1.1
 Content-Type: application/json
 
-{"quantity":0,"unit_price":-10}
+{"amount":0,"pin":""}
 ```
 
 Remove `required`, `pattern`, `min`, and `max` attributes have no effect on raw HTTP.
@@ -64,16 +64,16 @@ Remove `required`, `pattern`, `min`, and `max` attributes have no effect on raw 
 ### Pattern 4: Oversized and malformed input
 
 ```text
-username=AAAA...(100000 chars)...AAAA
-file=<binary without client size check>
-{"bio":"<script>alert(1)</script>"}
+recipient_name=AAAA...(100000 chars)...AAAA
+message=<binary without client size check>
+{"note":"<script>alert(1)</script>"}
 ```
 
 ### Pattern 5: Replay and step-skipping
 
 ```http
-POST /api/order/confirm
-{"order_id":12345,"status":"paid","payment_verified":true}
+POST /api/subscription/activate
+{"subscription_id":555,"status":"active","payment_captured":true}
 ```
 
 Skip wizard steps the UI enforces in JavaScript only.
@@ -81,10 +81,10 @@ Skip wizard steps the UI enforces in JavaScript only.
 ### Pattern 6: Alternate API versions and content types
 
 ```http
-POST /api/v1/profile
+POST /api/v2/gift-cards/redeem
 Content-Type: application/x-www-form-urlencoded
 
-role=admin&email=attacker@example.com
+amount=1000&tier=enterprise&email=attacker@example.com
 ```
 
 Mobile or legacy endpoints may lack validators present in the SPA.
@@ -125,10 +125,10 @@ rules: { amount: { minValue: minValue(0) } }
 ### Python (missing server validation)
 
 ```python
-@app.route("/checkout", methods=["POST"])
-def checkout():
+@app.route("/gift-cards/redeem", methods=["POST"])
+def redeem_gift_card():
     data = request.get_json()  # no pydantic/marshmallow
-    total = data["quantity"] * data["unit_price"]
+    balance = data["amount"] + data.get("bonus", 0)
 ```
 
 ### Java (Bean Validation gap)
@@ -174,25 +174,25 @@ from flask import Flask, request, session, jsonify
 
 app = Flask(__name__)
 
-@app.route("/checkout", methods=["POST"])
-def checkout():
+@app.route("/gift-cards/redeem", methods=["POST"])
+def redeem_gift_card():
     data = request.get_json()
-    # Vue form validates quantity and coupon client-side only — server trusts JSON
-    total = data["quantity"] * data["unit_price"]
-    order = Order(
+    # React form validates amount and PIN client-side only — server trusts JSON
+    credit = data["amount"] + data.get("bonus", 0)
+    redemption = GiftRedemption(
         user_id=session["user_id"],
-        total=total,
-        coupon=data.get("coupon"),
+        credit=credit,
+        pin=data.get("pin"),
     )
-    db.session.add(order)
+    db.session.add(redemption)
     db.session.commit()
-    return jsonify({"total": total})
+    return jsonify({"credit": credit})
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Inventory client validation.** List forms and API fields with HTML5 constraints, JavaScript checks, or mobile validators.
-2. **Open the matching server handler.** In the sample, `checkout` reads JSON and computes total without range checks. Ask whether quantity, price, or coupon are validated server-side; they are not.
+2. **Open the matching server handler.** In the sample, `redeem_gift_card` reads JSON and computes credit without range checks. Ask whether amount, bonus, or PIN are validated server-side; they are not.
 3. **Compare client and server rules.** Required fields, numeric ranges, regex patterns, and max lengths must match—or the server must be stricter.
 4. **Review hidden and disabled fields.** Attackers can POST `role`, `price`, or `userId` even when the UI hides them.
 5. **Check SPA-only APIs.** Absence of browser forms does not remove the need for server validation.
@@ -214,60 +214,60 @@ def checkout():
 ### Java
 
 ```java
-@PostMapping("/transfer")
-public ResponseEntity<?> transfer(@RequestBody TransferRequest req) {
-    // Front-end enforces amount > 0 and recipient format; server skips validation
-    accountService.transfer(req.getFromId(), req.getToAccount(), req.getAmount());
+@PostMapping("/gift-cards/redeem")
+public ResponseEntity<?> redeem(@RequestBody RedeemRequest req) {
+    // Front-end enforces amount > 0 and PIN format; server skips validation
+    giftCardService.redeem(req.getPin(), req.getAmount(), req.getBonus());
     return ResponseEntity.ok().build();
 }
 
-@PostMapping("/register")
-public String register(@RequestParam String email, @RequestParam String password) {
-    userService.create(email, password); // no server-side email/password policy
-    return "redirect:/login";
+@PostMapping("/subscriptions/upgrade")
+public String upgrade(@RequestParam String tier, @RequestParam int months) {
+    subscriptionService.upgrade(currentUser(), tier, months); // no server-side tier policy
+    return "redirect:/account";
 }
 ```
 
 ### C#
 
 ```csharp
-[HttpPost("update-profile")]
-public IActionResult UpdateProfile(ProfileDto dto)
+[HttpPost("gift-cards/redeem")]
+public IActionResult RedeemGiftCard(RedeemDto dto)
 {
-    // Blazor form validates phone format; API endpoint accepts raw dto
-    _service.UpdateProfile(UserId, dto);
+    // Blazor form validates PIN format; API endpoint accepts raw dto
+    _service.Redeem(UserId, dto);
     return Ok();
 }
 
-public class ProfileDto
+public class RedeemDto
 {
-    public string Phone { get; set; }
-    public string DisplayName { get; set; } // no [Required], [Phone], or length limits
+    public string Pin { get; set; }
+    public decimal Amount { get; set; } // no [Range], [Required], or length limits
 }
 ```
 
 ### JavaScript
 
 ```javascript
-function validateCheckout() {
-  const qty = Number(document.querySelector('[name="quantity"]').value);
-  if (qty < 1 || qty > 10) return false;
+function validateRedeem() {
+  const amount = Number(document.querySelector('[name="amount"]').value);
+  if (amount < 5 || amount > 500) return false;
   return true; // bypass with curl; server must re-validate
 }
 
-document.getElementById("checkout").addEventListener("submit", (e) => {
-  if (!validateCheckout()) e.preventDefault();
-  // hidden price/role fields sent without server-side recomputation
+document.getElementById("redeem").addEventListener("submit", (e) => {
+  if (!validateRedeem()) e.preventDefault();
+  // hidden bonus/tier fields sent without server-side recomputation
 });
 ```
 
 ### HTML
 
 ```html
-<form action="/checkout" method="post">
-  <input type="number" name="quantity" min="1" max="10" required>
-  <input type="hidden" name="price" value="9.99">
-  <input type="hidden" name="role" value="user">
+<form action="/gift-cards/redeem" method="post">
+  <input type="number" name="amount" min="5" max="500" required>
+  <input type="hidden" name="bonus" value="0">
+  <input type="hidden" name="tier" value="standard">
   <!-- min/max/required are browser hints only; not enforced on server -->
 </form>
 ```
@@ -281,20 +281,19 @@ Validate at the API boundary with Pydantic. Recompute trusted fields server-side
 ```python
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
-class CheckoutRequest(BaseModel):
+class GiftCardRedeemRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    quantity: int = Field(ge=1, le=10)
-    sku: str = Field(max_length=64)
+    amount: float = Field(ge=5, le=500)
+    pin: str = Field(min_length=8, max_length=16)
 
-@app.route("/checkout", methods=["POST"])
-def checkout():
-    req = CheckoutRequest.model_validate(request.get_json())
-    unit_price = catalog.price_for(req.sku)  # server-computed, not from client
-    total = req.quantity * unit_price
-    order = Order(user_id=session["user_id"], total=total, sku=req.sku)
-    db.session.add(order)
+@app.route("/gift-cards/redeem", methods=["POST"])
+def redeem_gift_card():
+    req = GiftCardRedeemRequest.model_validate(request.get_json())
+    credit = gift_cards.redeem(req.pin, req.amount)  # server-computed, not from client bonus field
+    redemption = GiftRedemption(user_id=session["user_id"], credit=credit)
+    db.session.add(redemption)
     db.session.commit()
-    return jsonify({"total": total})
+    return jsonify({"credit": credit})
 ```
 
 **Important:** Client-side validation is UX only. Every security-relevant rule must exist on the server.
@@ -303,9 +302,9 @@ def checkout():
 # Marshmallow alternative:
 from marshmallow import Schema, fields, validate
 
-class CheckoutSchema(Schema):
-    quantity = fields.Int(required=True, validate=validate.Range(min=1, max=10))
-    sku = fields.Str(required=True, validate=validate.Length(max=64))
+class RedeemSchema(Schema):
+    amount = fields.Decimal(required=True, validate=validate.Range(min=5, max=500))
+    pin = fields.Str(required=True, validate=validate.Length(min=8, max=16))
 ```
 
 ### Java
@@ -313,15 +312,14 @@ class CheckoutSchema(Schema):
 Apply Jakarta Bean Validation on request DTOs. Reject invalid input before the service layer.
 
 ```java
-public record TransferRequest(
-    @NotNull @Positive Long fromId,
-    @NotBlank @Pattern(regexp = "^[A-Z0-9]{8,34}$") String toAccount,
-    @NotNull @DecimalMin("0.01") BigDecimal amount
+public record GiftCardRedeemRequest(
+    @NotBlank @Pattern(regexp = "^[A-Z0-9]{8,16}$") String pin,
+    @NotNull @DecimalMin("5.00") @DecimalMax("500.00") BigDecimal amount
 ) {}
 
-@PostMapping("/transfer")
-public ResponseEntity<?> transfer(@Valid @RequestBody TransferRequest req) {
-    accountService.transfer(req.fromId(), req.toAccount(), req.amount());
+@PostMapping("/gift-cards/redeem")
+public ResponseEntity<?> redeem(@Valid @RequestBody GiftCardRedeemRequest req) {
+    giftCardService.redeem(req.pin(), req.amount());
     return ResponseEntity.ok().build();
 }
 ```
@@ -333,21 +331,21 @@ public ResponseEntity<?> transfer(@Valid @RequestBody TransferRequest req) {
 Use DataAnnotations or FluentValidation. Check ModelState on every mutating action.
 
 ```csharp
-public class ProfileDto
+public class RedeemDto
 {
-    [Required, Phone]
-    public string Phone { get; set; } = "";
+    [Required, RegularExpression("^[A-Z0-9]{8,16}$")]
+    public string Pin { get; set; } = "";
 
-    [Required, StringLength(64, MinimumLength = 1)]
-    public string DisplayName { get; set; } = "";
+    [Required, Range(5, 500)]
+    public decimal Amount { get; set; }
 }
 
-[HttpPost("update-profile")]
-public IActionResult UpdateProfile([FromBody] ProfileDto dto)
+[HttpPost("gift-cards/redeem")]
+public IActionResult RedeemGiftCard([FromBody] RedeemDto dto)
 {
     if (!ModelState.IsValid)
         return BadRequest(ModelState);
-    _service.UpdateProfile(UserId, dto);
+    _service.Redeem(UserId, dto);
     return Ok();
 }
 ```
@@ -361,15 +359,13 @@ Validate struct tags after JSON decode. Reject unknown fields.
 ```go
 import "github.com/go-playground/validator/v10"
 
-type CreateOrderRequest struct {
-    Quantity int    `json:"quantity" validate:"required,min=1,max=10"`
-    Sku      string `json:"sku" validate:"required,max=64"`
+type RedeemGiftCardRequest struct {
+    Amount float64 `json:"amount" validate:"required,gte=5,lte=500"`
+    Pin    string  `json:"pin" validate:"required,min=8,max=16"`
 }
 
-var validate = validator.New()
-
-func createOrder(w http.ResponseWriter, r *http.Request) {
-    var req CreateOrderRequest
+func redeemGiftCard(w http.ResponseWriter, r *http.Request) {
+    var req RedeemGiftCardRequest
     dec := json.NewDecoder(r.Body)
     dec.DisallowUnknownFields()
     if err := dec.Decode(&req); err != nil {
@@ -380,8 +376,8 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "validation failed", http.StatusBadRequest)
         return
     }
-    price := catalog.Price(req.Sku)
-    db.Exec("INSERT INTO orders (qty, price) VALUES ($1,$2)", req.Quantity, price)
+    credit := giftcards.Redeem(req.Pin, req.Amount)
+    db.Exec("INSERT INTO redemptions (user_id, credit) VALUES ($1,$2)", userID(r), credit)
 }
 ```
 

@@ -139,24 +139,27 @@ WordPress/Laravel: weak `password_hash` options, reset without `Hash::check` on 
 
 ```python
 import hashlib
-from flask import Flask, request, session
+import secrets
+from datetime import datetime, timedelta
+from django.contrib.auth.hashers import make_password
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
-app = Flask(__name__)
-
-@app.route("/reset", methods=["POST"])
-def reset_password():
-    email = request.form["email"]
-    user = db.users.find_one({"email": email})
+@require_POST
+def reset_password(request):
+    email = request.POST["email"]
+    user = User.objects.filter(email=email).first()
     if not user:
-        return "unknown email", 404  # enumerates valid accounts
-    token = hashlib.md5(email.encode()).hexdigest()  # predictable
+        return JsonResponse({"error": "No account with that email"}, status=404)
+    token = hashlib.sha1(email.encode()).hexdigest()[:16]  # predictable
+    ResetToken.objects.create(user=user, token=token, expires=datetime.utcnow() + timedelta(hours=24))
     send_mail(email, f"https://app/reset?token={token}")
-    return "sent", 200
+    return JsonResponse({"ok": True})
 
-@app.route("/mfa/disable", methods=["POST"])
-def disable_mfa():
-    session["mfa_enabled"] = False  # no reauthentication
-    return "ok"
+@require_POST
+def disable_mfa(request):
+    request.session["mfa_enabled"] = False  # no reauthentication
+    return JsonResponse({"ok": True})
 ```
 
 ## Step-by-Step Review Walkthrough

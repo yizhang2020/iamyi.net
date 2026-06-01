@@ -69,9 +69,9 @@ Use these in authorized cryptographic review and lab testing—not against produ
 ### Pattern 5: Hardcoded key from source leak
 
 ```text
-# Key in git history: KEY = b"0123456789012345"
-# Decrypt all historical ciphertext after repo fork or leak
-grep -r "0123456789012345" .
+# Fernet key committed in settings.py: FIELD_KEY = b'abc123xyz7890123456789012345678='
+# Decrypt all historical field ciphertext after repo fork or leak
+grep -r "FIELD_KEY" config/
 ```
 
 ## Language-Specific Sinks and Dangerous APIs

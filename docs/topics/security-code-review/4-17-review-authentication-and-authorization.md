@@ -79,12 +79,12 @@ Every sensitive handler should call an authorization check before loading or mut
 ### Python
 
 ```python
-@app.route("/api/document/<doc_id>")
-def get_document(doc_id):
-    return db.documents.find_one({"_id": doc_id})  # no owner filter
+@app.get("/api/projects/{project_id}")
+def get_project(project_id: str):
+    return db.query(Project).get(project_id)  # no owner filter
 
-if request.json.get("is_admin"):
-    grant_admin()
+if request.json.get("is_billing_admin"):
+    grant_billing_admin()
 ```
 
 Flask/Django: views with auth decorator but no object-level check. DRF: `IsAuthenticated` without `has_object_permission`.
@@ -150,23 +150,23 @@ Laravel: `auth` middleware without `$this->authorize()` or policy on model.
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, session, request, jsonify
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route("/api/document/<doc_id>")
-def get_document(doc_id):
-    if "user" not in session:
-        return "", 401
-    # Authenticated but no ownership check — any user reads any document
-    return jsonify(db.documents.find_one({"_id": doc_id}))
+@app.get("/api/projects/{project_id}")
+def get_project(project_id: str, db: Session = Depends(get_db)):
+    if not current_user_id():
+        raise HTTPException(status_code=401)
+    # Authenticated but no tenant/owner filter — any user reads any project
+    return db.query(Project).filter(Project.id == project_id).one()
 
-@app.route("/admin/settings", methods=["POST"])
-def save_settings():
-    # No role check; any caller who reaches the route can update config
-    data = request.get_json()
-    config.update(data)
-    return jsonify(ok=True)
+@app.post("/admin/billing")
+def update_billing(payload: dict):
+    # No role check; any caller who reaches the route can change billing config
+    billing_config.update(payload)
+    return {"ok": True}
 ```
 
 ## Step-by-Step Review Walkthrough

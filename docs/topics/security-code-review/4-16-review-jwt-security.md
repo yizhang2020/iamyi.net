@@ -24,7 +24,7 @@ The unsafe assumption is that base64-encoded payloads are trustworthy because th
 | Signal | Where to look |
 | --- | --- |
 | **Feature type** | API auth middleware, microservice trust, mobile backends, OAuth resource servers |
-| **Parse without verify** | `jwt.decode` with `verify_signature=False`, manual base64 JSON parsing for auth |
+| **Parse without verify** | Permissive `algorithms=` including `none`, RS256→HS256 confusion, manual header parsing for key selection |
 | **Key material** | Hardcoded `"secretkey"`, dev keys shipped to prod, missing JWKS rotation |
 | **Algorithm issues** | `none` accepted, HS256/RS256 confusion, ignoring `alg` header |
 | **Claim validation** | Missing `exp`, `iss`, `aud`, or excessive access token lifetime |
@@ -65,11 +65,12 @@ Signed with -----BEGIN PUBLIC KEY----- material
 {"sub":"user1"}           # no exp claim
 ```
 
-### Pattern 5: Claim tampering with verification disabled
+### Pattern 5: Weak symmetric secret brute-forced offline
 
 ```python
-jwt.decode(token, options={"verify_signature": False})
-# Change "role":"user" → "role":"admin" in payload, resubmit
+# Attacker re-signs payload after cracking "dev-jwt-key-2024" from a container image layer
+import jwt
+jwt.encode({"sub": "admin", "scope": "billing:write"}, "dev-jwt-key-2024", algorithm="HS256")
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -80,11 +81,11 @@ Find every path that decodes JWTs for authentication or authorization decisions.
 
 ```python
 import jwt
-jwt.decode(token, options={"verify_signature": False})
-jwt.decode(token, "changeme", algorithms=["HS256", "none"])
+jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256", "RS256", "none"])
+jwt.get_unverified_header(token)  # used alone to pick HMAC key for confusion
 ```
 
-PyJWT, `python-jose`, manual `base64` + `json.loads` on middle segment.
+PyJWT with permissive `algorithms=` list; `python-jose` `jwt.decode` without `aud`/`iss` checks.
 
 ### Java
 
@@ -140,15 +141,19 @@ JWT.decode(token, 'secret', true, { algorithm: 'none' })
 ```python
 import jwt
 
-SECRET = "changeme"
+SECRET = "dev-jwt-key-2024"  # copied into every microservice image
 
-def current_user(auth_header):
+def current_user(auth_header: str) -> dict:
     token = auth_header.split(" ", 1)[1]
-    # Signature verification disabled — attacker forges any payload
-    return jwt.decode(token, options={"verify_signature": False})
+    # Accepts alg:none and RS256→HS256 confusion when public key is reused as HMAC secret
+    return jwt.decode(token, SECRET, algorithms=["HS256", "RS256", "none"])
 
-def issue_token(user):
-    return jwt.encode({"sub": user.id, "admin": True}, SECRET, algorithm="HS256")
+def issue_token(user) -> str:
+    return jwt.encode(
+        {"sub": str(user.id), "role": "admin", "exp": 9999999999},
+        SECRET,
+        algorithm="HS256",
+    )
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -213,10 +218,11 @@ public ClaimsPrincipal Validate(string token)
 ### JavaScript
 
 ```javascript
-function currentUser() {
-  const token = localStorage.getItem('access_token');
-  const payload = JSON.parse(atob(token.split('.')[1]));
-  return { id: payload.sub, isAdmin: payload.admin === true };
+const jwt = require('jsonwebtoken');
+function currentUser(req) {
+  const token = req.headers.authorization?.slice(7);
+  // verify disabled — accepts alg:none and arbitrary claims
+  return jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256', 'none'] });
 }
 ```
 
@@ -353,6 +359,7 @@ func authMiddleware(next http.Handler) http.Handler {
 - Signing keys are not hardcoded in production; rotation and JWKS are supported where applicable.
 - Authorization uses claims from verified tokens only, not duplicate client-controlled headers.
 - Access token lifetime matches risk; refresh and logout invalidate continued use when required.
+Note: For issuance, JWKS, and refresh rotation review, see [10.3 Review JWT Implementation](10-03-review-jwt-implementation.md). For unverified-claims and TLS/cookie clusters, see [4.41 Review Insecure Coding Practice](4-41-review-insecure-coding-practice.md).
 
 ## Reference
 

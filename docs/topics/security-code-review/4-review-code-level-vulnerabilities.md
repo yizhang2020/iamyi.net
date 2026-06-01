@@ -36,6 +36,10 @@ Each vulnerability family below has its own standalone chapter. Every mini-chapt
 
 The archive article [Secure Coding in Practice](secure-coding-in-practice.md) remains available as background reading; mini-chapters do not link to it in their reference sections.
 
+### Code diversity across examples
+
+Examples are intentionally varied across chapters. The same function call (for example `subprocess` with `shell=True`, `jwt.decode(..., verify_signature=False)`, or a generic `ping` wrapper) should not repeat in another mini-chapter unless this page shows a **vulnerable** pattern paired with a **fixed** contrast in the same section. Prefer different libraries, business scenarios, and sink APIs so readers see a wider attack surface—not one canonical snippet copied everywhere.
+
 ## Input Validation, Injection, and Parsing
 
 - [4.1 Review Stored XSS](4-01-review-stored-xss.md)

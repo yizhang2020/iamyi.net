@@ -136,25 +136,26 @@ s3.put_object(Key=user_key, ACL='public-read')  # user-controlled key under web 
 ## Sample Vulnerable Code in Python
 
 ```python
-import os
+import uuid
+from pathlib import Path
+from fastapi import FastAPI, File, UploadFile
 
-from flask import Flask, request
+app = FastAPI()
+MEDIA_ROOT = Path("/var/www/html/media")
 
-app = Flask(__name__)
-
-@app.route("/upload", methods=["POST"])
-def upload():
-    f = request.files["file"]
-    # Extension-only check; client filename used as path under web root
-    if f.filename.endswith((".png", ".jpg")):
-        f.save(os.path.join("/var/www/static/uploads", f.filename))
-    return "ok"
+@app.post("/media/upload")
+async def media_upload(file: UploadFile = File(...)):
+    # Extension-only check; client filename used under web root
+    if file.filename.endswith((".png", ".jpg", ".jpeg")):
+        dest = MEDIA_ROOT / file.filename
+        dest.write_bytes(await file.read())
+    return {"ok": True}
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Locate multipart handlers and presigned upload APIs.** Trace from receive to persist to serve.
-2. **Trace the Python upload handler.** In the sample, extension checks miss polyglots and the client filename lands under a static web root.
+2. **Trace the media upload handler.** In the sample, extension checks miss polyglots and the client filename lands under a web-served directory.
 3. **Check validation order.** Enforce size limits before buffering entire files into memory.
 4. **Review stored location.** Files under executable web roots with predictable names enable direct URL access.
 5. **Inspect renaming strategy.** Server-generated keys must replace client-supplied basenames on disk.

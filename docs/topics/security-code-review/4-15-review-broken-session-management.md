@@ -77,12 +77,16 @@ Trace session creation, cookie issuance, rotation at login, and invalidation at 
 ### Python
 
 ```python
-from flask import session
-session['user'] = username  # no regenerate after login
-resp.set_cookie('session', sid, httponly=False, secure=False, samesite='None')
+from starlette.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+
+# SessionMiddleware with permissive cookie flags — fixation if ID not rotated at login
+session_store["user"] = username  # same session key before and after auth
+response = RedirectResponse("/home")
+response.set_cookie("sid", session_id, httponly=False, secure=False, samesite="none")
 ```
 
-Django: `request.session` without `cycle_key()` on login. Starlette: `SessionMiddleware` cookie flags.
+Django: `login()` without `cycle_key()`; Flask `session` without clear/regenerate on auth success.
 
 ### Java
 
@@ -133,28 +137,39 @@ setcookie(session_name(), session_id(), 0, '/');  // no httponly/secure flags
 ## Sample Vulnerable Code in Python
 
 ```python
-import uuid
-from flask import Flask, request, redirect, session, make_response
+import secrets
+from starlette.applications import Starlette
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
+from starlette.routing import Route
 
-app = Flask(__name__)
+async def sso_callback(request: Request):
+    form = await request.form()
+    if not valid_saml_response(form):
+        return RedirectResponse("/login?failed=1", status_code=303)
+    # Reuses pre-login session; short ID; cookie missing HttpOnly/Secure
+    if "sid" not in request.session:
+        request.session["sid"] = secrets.token_hex(4)
+    request.session["user"] = extract_username(form)
+    resp = RedirectResponse("/dashboard", status_code=303)
+    resp.set_cookie(
+        "sso_session",
+        request.session["sid"],
+        httponly=False,
+        secure=False,
+        samesite="none",
+    )
+    return resp
 
-@app.route("/login", methods=["POST"])
-def login():
-    if valid_credentials(request.form):
-        # Reuses pre-login session; short predictable ID; weak cookie flags
-        if "session_id" not in session:
-            session["session_id"] = str(uuid.uuid4())[:8]
-        session["user"] = request.form["username"]
-        resp = make_response(redirect("/home"))
-        resp.set_cookie("session", session["session_id"], samesite="None")
-        return resp
-    return "failed", 401
+app = Starlette(routes=[Route("/sso/callback", sso_callback, methods=["POST"])])
+app.add_middleware(SessionMiddleware, secret_key="dev-only", https_only=False)
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Map session creation.** Note when `getSession(true)` runs, how IDs are generated, and whether login reuses an existing ID.
-2. **Trace login success.** Confirm the server invalidates the old session or calls `changeSessionId` / `session.regenerate()` before setting auth attributes.
+2. **Trace login success.** Confirm the server invalidates the old session or rotates the session key before setting auth attributes (Starlette `session.clear()` or Django `cycle_key()`).
 3. **Review cookie flags.** Check `HttpOnly`, `Secure`, `SameSite`, path, and domain scope on session cookies.
 4. **Check idle and absolute timeouts.** Review `setMaxInactiveInterval`, sliding expiration, and remember-me lifetimes.
 5. **Follow logout and password change.** Server-side invalidation, token blacklist, and clearing all devices when required.
@@ -178,13 +193,13 @@ def login():
 ### Java
 
 ```java
-@WebServlet("/login")
-public class LoginServlet extends HttpServlet {
+@WebServlet("/sso/callback")
+public class SsoCallbackServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
         HttpSession session = req.getSession(); // reuses attacker-supplied JSESSIONID
-        if (authenticate(req.getParameter("user"), req.getParameter("pass"))) {
-            session.setAttribute("user", req.getParameter("user"));
+        if (validateSamlResponse(req.getParameter("SAMLResponse"))) {
+            session.setAttribute("user", extractNameId(req));
             Cookie c = new Cookie("JSESSIONID", session.getId());
             resp.addCookie(c);
             resp.sendRedirect("/dashboard");
@@ -196,14 +211,14 @@ public class LoginServlet extends HttpServlet {
 ### C#
 
 ```csharp
-[HttpPost("login")]
-public IActionResult Login(LoginModel model)
+[HttpPost("sso/callback")]
+public IActionResult SsoCallback(SamlResponseModel model)
 {
-    if (_auth.Validate(model.Username, model.Password))
+    if (_saml.Validate(model.Response))
     {
-        HttpContext.Session.SetString("User", model.Username);
+        HttpContext.Session.SetString("User", model.NameId);
         Response.Cookies.Append("SessionId", HttpContext.Session.Id);
-        return RedirectToAction("Index", "Home");
+        return RedirectToAction("Index", "Dashboard");
     }
     return Unauthorized();
 }
@@ -212,13 +227,17 @@ public IActionResult Login(LoginModel model)
 ### Go
 
 ```go
-func login(w http.ResponseWriter, r *http.Request) {
-    sid := r.URL.Query().Get("sid")
-    if sid == "" {
-        sid = fmt.Sprintf("%d", time.Now().Unix())
+func ssoCallback(w http.ResponseWriter, r *http.Request) {
+    token := r.FormValue("session_token")
+    if token == "" {
+        token = fmt.Sprintf("%d", time.Now().UnixNano()/1e6)
     }
-    store[sid] = r.FormValue("user")
-    http.SetCookie(w, &http.Cookie{Name: "sid", Value: sid, Path: "/"})
+    if !validateSaml(r.FormValue("SAMLResponse")) {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    store[token] = extractSubject(r)
+    http.SetCookie(w, &http.Cookie{Name: "sso_session", Value: token, Path: "/"})
     http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 ```
@@ -240,14 +259,14 @@ app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
 
-@app.route("/login", methods=["POST"])
-def login():
-    if not valid_credentials(request.form):
+@app.route("/sso/callback", methods=["POST"])
+def sso_callback():
+    if not valid_saml_response(request.form):
         return "failed", 401
     session.clear()
-    session["user"] = request.form["username"]
+    session["user"] = extract_username(request.form)
     session["sid"] = secrets.token_urlsafe(32)
-    return redirect("/home")
+    return redirect("/dashboard")
 
 @app.route("/logout", methods=["POST"])
 def logout():
@@ -264,7 +283,7 @@ Rotate session ID on successful login. Configure secure cookie tracking.
 ```java
 protected void doPost(HttpServletRequest req, HttpServletResponse resp)
         throws ServletException, IOException {
-    if (!authenticate(req.getParameter("user"), req.getParameter("pass"))) {
+    if (!validateSamlResponse(req.getParameter("SAMLResponse"))) {
         resp.sendError(HttpServletResponse.SC_UNAUTHORIZED);
         return;
     }
@@ -273,7 +292,7 @@ protected void doPost(HttpServletRequest req, HttpServletResponse resp)
         old.invalidate();
     }
     HttpSession session = req.getSession(true);
-    session.setAttribute("user", req.getParameter("user"));
+    session.setAttribute("user", extractNameId(req));
     req.changeSessionId(); // Servlet 3.1+
     resp.sendRedirect("/dashboard");
 }
@@ -297,20 +316,20 @@ protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 Use cookie authentication that issues a new auth ticket at sign-in.
 
 ```csharp
-[HttpPost("login")]
-public async Task<IActionResult> Login(LoginModel model)
+[HttpPost("sso/callback")]
+public async Task<IActionResult> SsoCallback(SamlResponseModel model)
 {
-    if (!_auth.Validate(model.Username, model.Password))
+    if (!_saml.Validate(model.Response))
         return Unauthorized();
 
     HttpContext.Session.Clear();
-    var claims = new[] { new Claim(ClaimTypes.Name, model.Username) };
+    var claims = new[] { new Claim(ClaimTypes.Name, model.NameId) };
     var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
     await HttpContext.SignInAsync(
         CookieAuthenticationDefaults.AuthenticationScheme,
         new ClaimsPrincipal(identity));
 
-    return RedirectToAction("Index", "Home");
+    return RedirectToAction("Index", "Dashboard");
 }
 ```
 
@@ -346,15 +365,15 @@ func newSessionID() (string, error) {
     return hex.EncodeToString(b), nil
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
-    if !validCredentials(r) {
+func ssoCallback(w http.ResponseWriter, r *http.Request) {
+    if !validateSaml(r.FormValue("SAMLResponse")) {
         http.Error(w, "unauthorized", http.StatusUnauthorized)
         return
     }
     sid, _ := newSessionID()
-    store.Set(sid, r.FormValue("user"), 30*time.Minute)
+    store.Set(sid, extractSubject(r), 30*time.Minute)
     http.SetCookie(w, &http.Cookie{
-        Name:     "sid",
+        Name:     "sso_session",
         Value:    sid,
         Path:     "/",
         HttpOnly: true,
@@ -366,10 +385,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
-    if c, err := r.Cookie("sid"); err == nil {
+    if c, err := r.Cookie("sso_session"); err == nil {
         store.Delete(c.Value)
     }
-    http.SetCookie(w, &http.Cookie{Name: "sid", MaxAge: -1, Path: "/"})
+    http.SetCookie(w, &http.Cookie{Name: "sso_session", MaxAge: -1, Path: "/"})
 }
 ```
 

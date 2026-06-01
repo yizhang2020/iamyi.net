@@ -91,9 +91,9 @@ Search every `Set-Cookie` path and framework session configuration.
 ### Python
 
 ```python
-resp.set_cookie("session", sid, httponly=False, secure=False)
-app.config["SESSION_COOKIE_SECURE"] = False
-app.config["SESSION_COOKIE_SAMESITE"] = None
+response.set_cookie("auth_token", token, httponly=False, secure=False)
+settings.SESSION_COOKIE_HTTPONLY = False
+settings.CSRF_COOKIE_SECURE = False
 ```
 
 Flask `session` defaults; Django `SESSION_COOKIE_HTTPONLY = False`; Starlette `set_cookie` without flags.
@@ -150,29 +150,28 @@ Gorilla sessions, `echo` cookie middleware without explicit flags.
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, make_response, redirect, request
+from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.views.decorators.http import require_POST
 
-app = Flask(__name__)
+settings.SESSION_COOKIE_HTTPONLY = False
+settings.SESSION_COOKIE_SECURE = False
+settings.SESSION_COOKIE_SAMESITE = None
 
-@app.route("/login", methods=["POST"])
-def login():
-    session_id = create_session(request.form["username"], request.form["password"])
-    resp = make_response(redirect("/dashboard"))
-    # Missing HttpOnly, Secure, and SameSite — readable by JS and sent over HTTP
-    resp.set_cookie("session", session_id, httponly=False, secure=False)
-    return resp
-
-@app.route("/remember")
-def remember_me():
-    resp = make_response(redirect("/dashboard"))
-    resp.set_cookie(
-        "session",
-        create_long_lived_session(),
-        max_age=60 * 60 * 24 * 365,  # one year — exceeds policy
+@require_POST
+def login(request):
+    session_key = create_session(request.POST["username"], request.POST["password"])
+    response = HttpResponseRedirect("/dashboard")
+    # Explicit weak flags on auth cookie — readable by JS, sent over HTTP, cross-site by default
+    response.set_cookie(
+        "auth_token",
+        session_key,
         httponly=False,
         secure=False,
+        samesite=None,
+        max_age=60 * 60 * 24 * 365,
     )
-    return resp
+    return response
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -269,24 +268,24 @@ Configure Flask or Django session cookies with explicit flags.
 ```python
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=True,  # True in production behind HTTPS
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
 )
 
-@app.route("/login", methods=["POST"])
-def login():
-    session_id = create_session(request.form["username"], request.form["password"])
-    resp = make_response(redirect("/dashboard"))
-    resp.set_cookie(
-        "session",
-        session_id,
+@require_POST
+def login(request):
+    session_key = create_session(request.POST["username"], request.POST["password"])
+    response = HttpResponseRedirect("/dashboard")
+    response.set_cookie(
+        "auth_token",
+        session_key,
         httponly=True,
         secure=True,
         samesite="Lax",
         max_age=8 * 3600,
     )
-    return resp
+    return response
 ```
 
 Pair Secure cookies with HTTPS enforcement and HSTS. See [Flask session configuration](https://flask.palletsprojects.com/en/stable/config/#SESSION_COOKIE_SECURE) and [Django cookie settings](https://docs.djangoproject.com/en/stable/ref/settings/#session-cookie-secure).

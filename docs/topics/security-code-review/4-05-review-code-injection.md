@@ -34,12 +34,16 @@ In command injection, the attacker extends existing OS command execution. In cod
 
 Use these in authorized tests when user input reaches an evaluator. Replace `TARGET` with the vulnerable parameter. Confirm the runtime language before relying on a single payload.
 
-### Pattern 1: Python expression and statement injection
+### Pattern 1: Python rule-engine expression injection
 
 ```python
-__import__('os').system('id')
-().__class__.__bases__[0].__subclasses__()[104].__init__.__globals__['sys'].modules['os'].system('id')
-open('/etc/passwd').read()
+eval(user_formula)  # user_formula = "__import__('os').system('whoami')"
+```
+
+### Pattern 1b: `exec` on workflow snippet from JSON
+
+```python
+exec(config["on_complete_hook"], globals())
 ```
 
 ### Pattern 2: JavaScript / Node eval
@@ -143,19 +147,20 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/calc")
-def calc():
-    # Attacker-controlled expression from query string
-    expr = request.args.get("expr", "0")
+@app.route("/billing/discount")
+def apply_discount():
+    # Attacker-controlled pricing rule from JSON body
+    rule = request.get_json().get("formula", "0")
+    subtotal = request.get_json().get("subtotal", 0)
     # Sink: arbitrary Python expression evaluated with full interpreter power
-    result = eval(expr)
-    return str(result)
+    discount = eval(rule, {"subtotal": subtotal})
+    return str(discount)
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for dynamic evaluation.** Find `eval`, `exec`, `ScriptEngine.eval`, `ExpressionParser`, and unsafe deserialization loaders.
-2. **Trace the Python (or equivalent) input path.** In the sample, `expr` comes directly from the query string into `eval`. Ask whether any grammar restriction exists; there is none.
+2. **Trace the Python (or equivalent) input path.** In the sample, `rule` comes directly from the JSON body into `eval`. Ask whether any grammar restriction exists; there is none.
 3. **Inspect concatenation before eval.** Patterns like `"Math.pow(" + x + ",2)"` assemble executable text from user fragments.
 4. **Review admin-only features.** Formula editors and webhook transformers may be reachable through privilege escalation.
 5. **Check framework expression languages.** SpEL, OGNL, EL, and rule engine APIs parse user text as code.
@@ -177,22 +182,22 @@ def calc():
 ### Java
 
 ```java
-public double evaluateFormula(String x, String y) throws ScriptException {
-    ScriptEngine engine = new ScriptEngineManager().getEngineByName("js");
-    String expression = "Math.pow(" + x + ",2) + " + y;
-    return ((Number) engine.eval(expression)).doubleValue();
+public boolean evaluateWorkflowRule(String userRule, Map<String, Object> ctx)
+        throws ScriptException {
+    ScriptEngine engine = new ScriptEngineManager().getEngineByName("groovy");
+    String expression = "status == 'approved' && " + userRule;
+    return (Boolean) engine.eval(expression, new SimpleBindings(ctx));
 }
 ```
 
 ### C#
 
 ```csharp
-public object EvaluateRule(string userRule, Dictionary<string, object> context)
+public decimal EvaluateShippingFormula(string userFormula, decimal weight)
 {
     var engine = new Microsoft.ClearScript.V8.V8ScriptEngine();
-    foreach (var kv in context)
-        engine.AddHostObject(kv.Key, kv.Value);
-    return engine.Evaluate(userRule);
+    engine.AddHostObject("weight", weight);
+    return Convert.ToDecimal(engine.Evaluate(userFormula));
 }
 ```
 
@@ -202,19 +207,21 @@ public object EvaluateRule(string userRule, Dictionary<string, object> context)
 const express = require("express");
 const app = express();
 
-app.get("/calc", (req, res) => {
-  const expr = req.query.expr || "0";
-  res.send(String(eval(expr))); // attacker-controlled expression
+app.post("/rules/test", (req, res) => {
+  const formula = req.body.formula || "0";
+  const ctx = { orderTotal: req.body.orderTotal };
+  res.send(String(eval(`with(ctx){${formula}}`))); // attacker-controlled expression
 });
 ```
 
 ### Go
 
 ```go
-func runUserScript(w http.ResponseWriter, r *http.Request) {
-    script := r.FormValue("script")
+func evaluatePricingRule(w http.ResponseWriter, r *http.Request) {
+    rule := r.FormValue("rule")
     vm := goja.New()
-    val, err := vm.RunString(script)
+    vm.Set("subtotal", parseFloat(r.FormValue("subtotal")))
+    val, err := vm.RunString("(" + rule + ")")
     if err != nil {
         http.Error(w, err.Error(), 500)
         return
@@ -232,14 +239,16 @@ Avoid `eval` and `exec` on untrusted strings. Use restricted evaluators or fixed
 ```python
 from simpleeval import simple_eval
 
-@app.route("/calc")
-def calc():
-    expr = request.args.get("expr", "0")
+@app.route("/billing/discount")
+def apply_discount():
+    body = request.get_json()
+    rule = body.get("formula", "0")
+    subtotal = body.get("subtotal", 0)
     try:
-        result = simple_eval(expr, names={})  # no builtins, no imports
+        discount = simple_eval(rule, names={"subtotal": subtotal})
     except Exception:
-        return "Invalid expression", 400
-    return str(result)
+        return "Invalid formula", 400
+    return str(discount)
 ```
 
 ```python
@@ -258,11 +267,16 @@ Replace `ScriptEngine.eval` on user input with arithmetic-only libraries or fixe
 import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
 
-public double evaluateFormula(double x, double y) {
-    Expression expr = new ExpressionBuilder("pow(x,2) + y")
-        .variables("x", "y")
+public double evaluateShipping(double weightKg, double distanceKm) {
+    Expression expr = new ExpressionBuilder("base + weight * rate + distance * perKm")
+        .variables("base", "weight", "rate", "distance", "perKm")
         .build();
-    return expr.setVariable("x", x).setVariable("y", y).evaluate();
+    return expr.setVariable("weight", weightKg)
+        .setVariable("distance", distanceKm)
+        .setVariable("base", 5.0)
+        .setVariable("rate", 0.8)
+        .setVariable("perKm", 0.05)
+        .evaluate();
 }
 ```
 

@@ -150,26 +150,25 @@ GET /login?password=Secret123! HTTP/1.1" 200
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, request, redirect, render_template
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
+from django.views.decorators.http import require_http_methods
 
-app = Flask(__name__)
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
+@require_http_methods(["GET", "POST"])
+def login(request):
     # Attacker-controlled credentials may arrive in the query string on GET
-    user = request.args.get("user") or request.form.get("user")
-    pwd = request.args.get("password") or request.form.get("password")
-    if user and pwd:
-        if do_login(user, pwd):
-            # Redirect may leave credentials in server access logs
-            return redirect(f"/home?user={user}")
-    return render_template("login.html")
+    user = request.GET.get("user") or request.POST.get("user")
+    pwd = request.GET.get("password") or request.POST.get("password")
+    if user and pwd and do_login(user, pwd):
+        # Redirect echoes username in query — may land in access logs
+        return HttpResponseRedirect(f"/home?user={user}")
+    return render(request, "login.html")
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find GET handlers that read secrets.** Search for routes that bind `password`, `token`, `api_key`, or `secret` from `request.args`, query parsers, or URL search params.
-2. **Trace the Python login path.** In the sample, GET and POST share one handler. A crafted link can place credentials in the URL bar, browser history, and proxy logs.
+2. **Trace the Django login handler.** In the sample, GET and POST share one view. A crafted link can place credentials in the URL bar, browser history, and proxy logs.
 3. **Inspect password reset and magic-link flows.** Long-lived tokens in query strings become shareable and loggable. Prefer POST exchange or opaque server-side lookup.
 4. **Review front-end link builders.** Search JavaScript for `?token=`, `password=`, or template strings that append secrets to `href` or redirect targets.
 5. **Check logging and analytics.** Access log formats, debug middleware, and exception messages must not record full URIs for auth endpoints.

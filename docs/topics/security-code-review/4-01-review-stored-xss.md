@@ -88,11 +88,11 @@ Search for these patterns on every read path from persistence to HTML output. An
 ### Python (Flask / Jinja2)
 
 ```python
-return render_template_string(user_bio)
-return Markup(user_comment)
-return render_template("profile.html", bio=bio | safe)
+return render_template_string(ticket_body)
+return Markup(review_text)
+return render_template("reviews.html", summary=summary | safe)
 env = Environment(autoescape=False)
-Template(user_stored_template).render()
+Template(user_notification_tpl).render()
 ```
 
 ### Java (JSP / servlets)
@@ -115,10 +115,10 @@ writer.Write(storedComment);  // no encoding
 ### JavaScript (SPA / Node rendering)
 
 ```javascript
-element.innerHTML = storedComment;
-document.write(userBio);
-$('#bio').html(storedProfile);
-dangerouslySetInnerHTML={{ __html: userBio }}
+element.innerHTML = ticket.message;
+document.write(review.summary);
+$('#review-body').html(storedRating);
+dangerouslySetInnerHTML={{ __html: note.content }}
 ```
 
 ### HTML (email and static builders)
@@ -143,28 +143,35 @@ from flask import Flask, request, redirect, session
 
 app = Flask(__name__)
 
-@app.route("/profile", methods=["POST"])
-def update_profile():
-    # Attacker-controlled bio is stored without server-side encoding policy
-    bio = request.form["bio"]
-    db.execute("UPDATE users SET bio = ? WHERE id = ?", (bio, session["user_id"]))
-    return redirect("/profile")
+@app.route("/support/tickets", methods=["POST"])
+def create_ticket():
+    # Attacker-controlled subject and body persist without encoding policy
+    subject = request.form["subject"]
+    body = request.form["body"]
+    db.execute(
+        "INSERT INTO tickets (user_id, subject, body) VALUES (?, ?, ?)",
+        (session["user_id"], subject, body),
+    )
+    return redirect("/support/tickets")
 
-@app.route("/profile")
-def show_profile():
-    row = db.execute(
-        "SELECT bio FROM users WHERE id = ?", (session["user_id"],)
-    ).fetchone()
-    # Sink: stored value concatenated into HTML — no encoding
-    return f"<div class='bio'>{row['bio']}</div>"
+@app.route("/support/tickets")
+def list_tickets():
+    rows = db.execute(
+        "SELECT subject, body FROM tickets ORDER BY created_at DESC LIMIT 20"
+    ).fetchall()
+    # Sink: stored ticket body concatenated into HTML — no encoding
+    html = "<ul>"
+    for row in rows:
+        html += f"<li><b>{row['subject']}</b><p>{row['body']}</p></li>"
+    return html + "</ul>"
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find write + read pairs.** Search for `INSERT`/`UPDATE` on user-editable fields, then `SELECT` paths that feed HTML. Stored XSS requires both persistence and display.
-2. **Trace the Python (or equivalent) write path.** In the sample, `request.form["bio"]` flows straight into SQL. Ask whether any canonicalization runs before storage; storage-time stripping is not a substitute for render-time encoding unless the field is strictly non-HTML forever.
-3. **Locate every read path for the same column.** Comments lists, admin tools, email digests, and JSON endpoints may reuse `bio` without the developer noticing.
-4. **Inspect the sink in `show_profile`.** The f-string builds HTML. Any stored `<script>` executes in the victim browser. Flag string-built HTML; prefer templates with auto-escape.
+2. **Trace the Python (or equivalent) write path.** In the sample, `request.form["body"]` flows straight into SQL. Ask whether any canonicalization runs before storage; storage-time stripping is not a substitute for render-time encoding unless the field is strictly non-HTML forever.
+3. **Locate every read path for the same column.** Agent queues, email digests, search indexes, and JSON endpoints may reuse ticket `body` without the developer noticing.
+4. **Inspect the sink in `list_tickets`.** The loop builds HTML with f-strings. Any stored `<script>` executes in the victim browser. Flag string-built HTML; prefer templates with auto-escape.
 5. **Check filters vs encoding.** If you see `bleach.clean` or regex validation, read whether it is allowlist-based and whether output still uses encoding at the template boundary.
 6. **Review secondary contexts.** Stored data in `href`, event handlers, `<script type="application/json">`, or Markdown renderers needs context-specific encoding, not only HTML body encoding.
 7. **Confirm cross-user impact.** Ask who can view the stored field. Payloads in shared feeds or admin views are often higher severity than self-only profile preview.
@@ -184,32 +191,32 @@ def show_profile():
 ### Java
 
 ```java
-@PostMapping("/comments")
-public String addComment(@RequestParam String body) {
-    commentRepo.save(new Comment(body, currentUser()));
-    return "redirect:/comments";
+@PostMapping("/reviews")
+public String submitReview(@RequestParam String productId, @RequestParam String text) {
+    reviewRepo.save(new ProductReview(productId, text, currentUser()));
+    return "redirect:/reviews/" + productId;
 }
 
-@GetMapping("/comments")
-public String listComments(Model model) {
-    model.addAttribute("comments", commentRepo.findAll());
-    return "comments"; // JSP: ${comment.body} without <c:out>
+@GetMapping("/reviews/{productId}")
+public String productReviews(@PathVariable String productId, Model model) {
+    model.addAttribute("reviews", reviewRepo.findByProductId(productId));
+    return "product-reviews"; // JSP: ${review.text} without <c:out>
 }
 ```
 
 ### C#
 
 ```csharp
-[HttpPost]
-public IActionResult AddNote(string content) {
-    _db.Notes.Add(new Note { Content = content, UserId = UserId });
+[HttpPost("announcements")]
+public IActionResult PostAnnouncement(string title, string message) {
+    _db.Announcements.Add(new Announcement { Title = title, Body = message });
     _db.SaveChanges();
-    return RedirectToAction("Index");
+    return RedirectToAction("Feed");
 }
 
-public IActionResult Index() {
-    var notes = _db.Notes.Where(n => n.UserId == UserId).ToList();
-    ViewBag.NotesHtml = string.Join("", notes.Select(n => $"<li>{n.Content}</li>"));
+public IActionResult Feed() {
+    var items = _db.Announcements.OrderByDescending(a => a.PostedAt).Take(10).ToList();
+    ViewBag.FeedHtml = string.Join("", items.Select(a => $"<article><h3>{a.Title}</h3><p>{a.Body}</p></article>"));
     return View();
 }
 ```
@@ -217,19 +224,19 @@ public IActionResult Index() {
 ### JavaScript
 
 ```javascript
-// Stored comment returned from API; SPA renders without encoding
-async function postComment(body) {
-  await fetch("/api/comments", {
+// Stored product review returned from API; SPA renders without encoding
+async function submitReview(productId, text) {
+  await fetch(`/api/products/${productId}/reviews`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ text }),
   });
 }
 
-function renderComments(comments) {
-  const list = document.getElementById("comments");
-  comments.forEach((c) => {
-    list.innerHTML += `<p>${c.body}</p>`; // persisted payload executes here
+function renderReviews(reviews) {
+  const container = document.getElementById("review-list");
+  reviews.forEach((r) => {
+    container.innerHTML += `<div class="review">${r.text}</div>`; // persisted payload executes here
   });
 }
 ```
@@ -237,30 +244,32 @@ function renderComments(comments) {
 ### HTML
 
 ```html
-<!-- Thymeleaf: stored note rendered as raw HTML -->
-<div class="note" th:utext="${note.content}"></div>
+<!-- Thymeleaf: stored announcement rendered as raw HTML -->
+<div class="announcement" th:utext="${announcement.body}"></div>
 
 <!-- JSP without JSTL escape -->
-<c:forEach var="comment" items="${comments}">
-  <div class="comment">${comment.body}</div>
+<c:forEach var="review" items="${reviews}">
+  <blockquote class="review">${review.text}</blockquote>
 </c:forEach>
 ```
 
 ### Go
 
 ```go
-func postComment(w http.ResponseWriter, r *http.Request) {
-    body := r.FormValue("body")
-    db.Exec("INSERT INTO comments (body) VALUES (?)", body)
-    http.Redirect(w, r, "/comments", http.StatusSeeOther)
+func postReview(w http.ResponseWriter, r *http.Request) {
+    text := r.FormValue("text")
+    productID := r.FormValue("product_id")
+    db.Exec("INSERT INTO reviews (product_id, text) VALUES (?, ?)", productID, text)
+    http.Redirect(w, r, "/products/"+productID, http.StatusSeeOther)
 }
 
-func listComments(w http.ResponseWriter, r *http.Request) {
-    rows, _ := db.Query("SELECT body FROM comments")
+func listReviews(w http.ResponseWriter, r *http.Request) {
+    productID := r.URL.Query().Get("id")
+    rows, _ := db.Query("SELECT text FROM reviews WHERE product_id = ?", productID)
     for rows.Next() {
-        var body string
-        rows.Scan(&body)
-        fmt.Fprintf(w, "<p>%s</p>", body) // no html.EscapeString / template
+        var text string
+        rows.Scan(&text)
+        fmt.Fprintf(w, "<blockquote>%s</blockquote>", text) // no html.EscapeString / template
     }
 }
 ```
@@ -278,13 +287,13 @@ from markupsafe import escape
 app = Flask(__name__)
 app.jinja_env.autoescape = True  # default in Flask for .html
 
-@app.route("/profile")
-def show_profile():
-    row = db.execute("SELECT bio FROM users WHERE id = ?", (session["user_id"],)).fetchone()
-    return render_template("profile.html", bio=row["bio"])
+@app.route("/support/tickets")
+def list_tickets():
+    rows = db.execute("SELECT subject, body FROM tickets ORDER BY created_at DESC").fetchall()
+    return render_template("tickets.html", tickets=rows)
 
 # Manual encoding when building non-template fragments:
-safe_snippet = escape(row["bio"])
+safe_body = escape(row["body"])
 ```
 
 **Important:** `|safe` in Jinja2 disables escaping. Use only for trusted, server-generated HTML. For rich text, sanitize with an allowlist library before optional `|safe`.
@@ -294,7 +303,7 @@ import bleach
 
 ALLOWED_TAGS = ["b", "i", "p", "a"]
 ALLOWED_ATTRS = {"a": ["href", "title"]}
-clean_bio = bleach.clean(bio, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
+clean_body = bleach.clean(ticket_body, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
 ```
 
 ### Java
@@ -303,14 +312,14 @@ Encode at the HTML sink. Prefer JSTL or OWASP Encoder over regex-only input filt
 
 ```jsp
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<p>Hello <c:out value="${comment.body}" /></p>
+<p>Review: <c:out value="${review.text}" /></p>
 ```
 
 ```java
 import org.owasp.encoder.Encode;
 
-String safe = Encode.forHtml(comment.getBody());
-model.addAttribute("safeBody", safe);
+String safe = Encode.forHtml(review.getText());
+model.addAttribute("safeReview", safe);
 ```
 
 **Important:** Thymeleaf `th:utext` and unescaped JSP scriptlets bypass default protections. Use `th:text` for untrusted data.
@@ -321,14 +330,14 @@ Razor encodes by default. Avoid `Html.Raw` on persisted fields.
 
 ```cshtml
 @* Safe default encoding *@
-<li>@note.Content</li>
+<article><h3>@announcement.Title</h3><p>@announcement.Body</p></article>
 ```
 
 ```csharp
 using System.Net;
 
-var encoded = WebUtility.HtmlEncode(note.Content);
-ViewBag.SafeLine = $"<li>{encoded}</li>";
+var encoded = WebUtility.HtmlEncode(announcement.Body);
+ViewBag.SafeBody = $"<p>{encoded}</p>";
 ```
 
 For controlled HTML subsets, use a maintained sanitizer such as [HtmlSanitizer](https://github.com/mganss/HtmlSanitizer) with an explicit policy.
@@ -340,11 +349,11 @@ Use `html/template`, not `text/template`, for HTML responses.
 ```go
 import "html/template"
 
-var profileTmpl = template.Must(template.New("profile").Parse(
-    `<div class="bio">{{.Bio}}</div>`))
+var reviewTmpl = template.Must(template.New("review").Parse(
+    `<blockquote class="review">{{.Text}}</blockquote>`))
 
-func showProfile(w http.ResponseWriter, bio string) {
-    profileTmpl.Execute(w, struct{ Bio string }{Bio: bio})
+func showReview(w http.ResponseWriter, text string) {
+    reviewTmpl.Execute(w, struct{ Text string }{Text: text})
 }
 ```
 

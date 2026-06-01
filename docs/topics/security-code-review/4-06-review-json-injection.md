@@ -37,48 +37,48 @@ Use these in authorized tests when user input is concatenated into JSON or merge
 ### Pattern 1: String termination and field injection
 
 ```json
-","role":"admin","x":"
-","isAdmin":true,"theme":"
+","tenant_id":"999","x":"
+","is_billing_admin":true,"note":"
 ```
 
-Built manually: `{"theme":"PAYLOAD","user_id":1}` where `PAYLOAD` closes the string and adds keys.
+Built manually: `{"note":"PAYLOAD","invoice_id":42}` where `PAYLOAD` closes the string and adds keys.
 
 ### Pattern 2: Prototype pollution (JavaScript merge sinks)
 
 ```json
-{"__proto__":{"isAdmin":true}}
-{"constructor":{"prototype":{"role":"admin"}}}
-{"__proto__":{"polluted":"yes"}}
+{"__proto__":{"canApproveInvoices":true}}
+{"constructor":{"prototype":{"tenant":"evil"}}}
+{"__proto__":{"skipFraudCheck":true}}
 ```
 
 ### Pattern 3: Mass-assignment privilege escalation
 
 ```json
-{"username":"alice","role":"admin","is_staff":true}
-{"price":0,"quantity":1,"unit_price":999}
-{"user_id":1,"owner_id":999}
+{"invoice_id":1001,"status":"paid","approved_by":"attacker"}
+{"line_total":0,"tax_rate":0,"currency":"USD"}
+{"owner_org_id":1,"target_org_id":999}
 ```
 
 ### Pattern 4: Array and type confusion
 
 ```json
-{"ids":[1,2,"3); DROP TABLE users;--"]}
-{"amount":"0.01","amount":0}
-{"enabled":"false"}
+{"line_items":[1,2,"'); DROP TABLE invoices;--"]}
+{"amount":"99.99","amount":0.01}
+{"auto_renew":"false"}
 ```
 
 ### Pattern 5: Nested object injection
 
 ```json
-{"settings":{"theme":"dark"},"permissions":{"delete":true}}
-{"metadata":{"__proto__":{"admin":true}}}
+{"metadata":{"source":"webhook"},"billing":{"write_off":true}}
+{"payload":{"__proto__":{"admin":true}}}
 ```
 
 ### Pattern 6: JSON inside JSON (double encoding)
 
 ```text
-%7B%22role%22%3A%22admin%22%7D
-{\"role\":\"admin\"}
+%7B%22status%22%3A%22paid%22%7D
+{\"status\":\"paid\"}
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -88,10 +88,10 @@ Search for manual JSON construction and untyped object merges. Any path that tru
 ### Python
 
 ```python
-payload = f'{{"theme":"{theme}","user_id":{uid}}}'
+payload = f'{{"note":"{note}","invoice_id":{inv_id}}}'
 data = json.loads(raw)  # then data.update(request.json)
-User(**request.get_json())  # accepts all keys if model allows
-settings = {**defaults, **request.json}
+Invoice(**request.get_json())  # accepts all keys if model allows
+webhook = {**defaults, **request.json}
 ```
 
 ### Java
@@ -139,24 +139,25 @@ JSON_SET(profile, CONCAT('$.', user_key), user_value);
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, request, session
+from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/api/settings", methods=["POST"])
-def save_settings():
-    # Attacker-controlled theme may contain unescaped quotes
-    theme = request.form["theme"]
+@app.route("/api/webhooks/invoice", methods=["POST"])
+def relay_invoice_webhook():
+    # Attacker-controlled note may contain unescaped quotes
+    note = request.form["note"]
+    invoice_id = request.form["invoice_id"]
     # Sink: manual JSON string — breaks structure or injects fields
-    payload = f'{{"theme":"{theme}","user_id":{session["user_id"]}}}'
-    redis.set(f"settings:{session['user_id']}", payload)
+    payload = f'{{"note":"{note}","invoice_id":{invoice_id}}}'
+    queue.publish("invoice-events", payload)
     return payload
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find JSON-producing and JSON-consuming endpoints.** Search for manual JSON assembly and `request.get_json()` merge paths.
-2. **Trace the Python (or equivalent) write path.** In the sample, `theme` is interpolated into a JSON string. Ask whether quotes in `theme` can break out of the string or add keys.
+2. **Trace the Python (or equivalent) write path.** In the sample, `note` is interpolated into a JSON string. Ask whether quotes in `note` can break out of the string or add keys.
 3. **Search for string-built JSON.** Flag f-strings and concatenation that build `{`, `}`, `"`, or `:` from HTTP input.
 4. **Review merge operations.** `dict.update`, `__dict__.update`, and spread operators that copy client keys into server objects accept extra fields like `is_admin`.
 5. **Check authorization and pricing logic.** Fields that drive access or amounts must be set server-side, not copied from client JSON.
@@ -178,78 +179,78 @@ def save_settings():
 ### Java
 
 ```java
-@PostMapping("/profile")
-public ResponseEntity<String> updateProfile(@RequestBody String raw) {
-    String json = "{\"user\":\"" + extractUsername(raw) + "\",\"prefs\":" + raw + "}";
-    profileStore.save(json);
+@PostMapping("/webhooks/invoice")
+public ResponseEntity<String> relayInvoice(@RequestBody String raw) {
+    String json = "{\"vendor\":\"" + extractVendor(raw) + "\",\"payload\":" + raw + "}";
+    eventBus.publish("invoice-events", json);
     return ResponseEntity.ok(json);
 }
 
-@PostMapping("/order")
-public Order create(@RequestBody Map<String, Object> body) {
-    Order order = new Order();
-    order.setQuantity((Integer) body.get("quantity"));
-    order.setPrice((Double) body.get("price")); // attacker sends "price": 0
-    order.setCustomerId(currentUserId());
-    return orderRepo.save(order);
+@PostMapping("/invoices/{id}/adjust")
+public Invoice adjust(@PathVariable long id, @RequestBody Map<String, Object> body) {
+    Invoice invoice = invoiceRepo.findById(id);
+    invoice.setStatus((String) body.get("status")); // attacker sends "status": "paid"
+    invoice.setWriteOff((Double) body.get("write_off"));
+    return invoiceRepo.save(invoice);
 }
 ```
 
 ### C#
 
 ```csharp
-[HttpPost("checkout")]
-public IActionResult Checkout([FromBody] JsonElement body)
+[HttpPost("webhooks/billing")]
+public IActionResult RelayBillingEvent([FromBody] JsonElement body)
 {
-    var json = $"{{\"sku\":\"{body.GetProperty("sku")}\",\"qty\":{body.GetProperty("qty")},\"discount\":{body.GetProperty("discount")}}}";
+    var json = $"{{\"event\":\"{body.GetProperty("event")}\",\"amount\":{body.GetProperty("amount")},\"memo\":\"{body.GetProperty("memo")}\"}}";
     _queue.Publish(json);
     return Ok(json);
 }
 
-[HttpPut("users/{id}")]
-public IActionResult UpdateUser(int id, [FromBody] Dictionary<string, object> fields)
+[HttpPatch("subscriptions/{id}")]
+public IActionResult PatchSubscription(int id, [FromBody] Dictionary<string, object> fields)
 {
-    var user = _db.Users.Find(id);
+    var sub = _db.Subscriptions.Find(id);
     foreach (var kv in fields)
-        typeof(User).GetProperty(kv.Key)?.SetValue(user, kv.Value);
+        typeof(Subscription).GetProperty(kv.Key)?.SetValue(sub, kv.Value);
     _db.SaveChanges();
-    return Ok(user);
+    return Ok(sub);
 }
 ```
 
 ### JavaScript
 
 ```javascript
-app.post("/api/settings", (req, res) => {
-  const color = req.body.color;
-  const payload = `{"color":"${color}","uid":${req.session.userId}}`;
-  db.run("UPDATE prefs SET data = ? WHERE uid = ?", payload, req.session.userId);
+app.post("/api/webhooks/invoice", (req, res) => {
+  const memo = req.body.memo;
+  const payload = `{"memo":"${memo}","invoice_id":${req.body.invoice_id}}`;
+  broker.publish("invoice-events", payload);
   res.type("json").send(payload);
 });
 
-app.patch("/api/users/me", (req, res) => {
-  Object.assign(currentUser, req.body); // merges attacker keys (e.g. role, price)
-  saveUser(currentUser);
-  res.json(currentUser);
+app.patch("/api/invoices/:id", (req, res) => {
+  Object.assign(currentInvoice, req.body); // merges attacker keys (e.g. status, write_off)
+  saveInvoice(currentInvoice);
+  res.json(currentInvoice);
 });
 ```
 
 ### Go
 
 ```go
-func updatePrefs(w http.ResponseWriter, r *http.Request) {
-    color := r.FormValue("color")
-    payload := fmt.Sprintf(`{"color":"%s","uid":%d}`, color, userIDFromSession(r))
-    db.Exec("UPDATE prefs SET data = $1 WHERE uid = $2", payload, userIDFromSession(r))
+func relayWebhook(w http.ResponseWriter, r *http.Request) {
+    memo := r.FormValue("memo")
+    invoiceID := r.FormValue("invoice_id")
+    payload := fmt.Sprintf(`{"memo":"%s","invoice_id":%s}`, memo, invoiceID)
+    queue.Publish("invoice-events", payload)
     w.Write([]byte(payload))
 }
 
-func applyPatch(w http.ResponseWriter, r *http.Request) {
+func patchInvoice(w http.ResponseWriter, r *http.Request) {
     var patch map[string]interface{}
     json.NewDecoder(r.Body).Decode(&patch)
-    user := loadUser(userIDFromSession(r))
-    mergeMap(user, patch) // copies attacker keys into struct via reflection
-    saveUser(user)
+    inv := loadInvoice(invoiceIDFromPath(r))
+    mergeMap(inv, patch) // copies attacker keys into struct via reflection
+    saveInvoice(inv)
 }
 ```
 
@@ -262,28 +263,29 @@ Build structures as dicts, then serialize with `json.dumps`. Never f-string JSON
 ```python
 import json
 
-@app.route("/api/settings", methods=["POST"])
-def save_settings():
-    theme = request.form["theme"]
-    payload = json.dumps({"theme": theme, "user_id": session["user_id"]})
-    redis.set(f"settings:{session['user_id']}", payload)
+@app.route("/api/webhooks/invoice", methods=["POST"])
+def relay_invoice_webhook():
+    note = request.form["note"]
+    invoice_id = int(request.form["invoice_id"])
+    payload = json.dumps({"note": note, "invoice_id": invoice_id})
+    queue.publish("invoice-events", payload)
     return payload
 ```
 
 ```python
 from pydantic import BaseModel, ConfigDict, Field
 
-class SettingsUpdate(BaseModel):
+class InvoiceAdjust(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    theme: str = Field(max_length=64)
+    memo: str = Field(max_length=256)
 
-@app.route("/api/user", methods=["PATCH"])
-def patch_user():
-    data = SettingsUpdate.model_validate(request.get_json())
-    user = current_user()
-    user.theme = data.theme  # explicit fields only
+@app.route("/invoices/<int:inv_id>/memo", methods=["PATCH"])
+def patch_invoice_memo(inv_id):
+    data = InvoiceAdjust.model_validate(request.get_json())
+    invoice = load_invoice(inv_id)
+    invoice.memo = data.memo  # explicit fields only
     db.session.commit()
-    return jsonify({"theme": user.theme})
+    return jsonify({"memo": invoice.memo})
 ```
 
 **Important:** Never `__dict__.update(request.json)` on persisted entities. Use separate read and write models.
@@ -297,16 +299,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 ObjectMapper mapper = new ObjectMapper();
 String json = mapper.writeValueAsString(Map.of(
-    "theme", theme,
-    "userId", currentUserId()
+    "note", note,
+    "invoiceId", invoiceId
 ));
 ```
 
 ```java
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record OrderRequest(
-    @NotNull @Min(1) Integer quantity
-    // price is NOT accepted from client — computed server-side
+public record InvoiceAdjustRequest(
+    @NotBlank @Size(max = 256) String memo
+    // status and write_off are NOT accepted from client — computed server-side
 ) {}
 ```
 
@@ -317,18 +319,18 @@ public record OrderRequest(
 Serialize typed objects. Reject unknown members on sensitive models.
 
 ```csharp
-var payload = JsonSerializer.Serialize(new CheckoutMessage
+var payload = JsonSerializer.Serialize(new BillingWebhookMessage
 {
-    Sku = dto.Sku,
-    Qty = dto.Qty,
-    Discount = ComputeDiscount(dto.Sku, UserId) // server-computed
+    Event = dto.Event,
+    Amount = dto.Amount,
+    Tax = ComputeTax(dto.Sku, UserId) // server-computed
 });
 ```
 
 ```csharp
 // Strict deserialization:
 var options = new JsonSerializerOptions { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-var dto = JsonSerializer.Deserialize<UpdateProfileRequest>(body, options);
+var dto = JsonSerializer.Deserialize<InvoiceMemoRequest>(body, options);
 ```
 
 **Important:** Audit `[JsonExtensionData]` on sensitive models. Unexpected keys must not silently capture privileged fields.
@@ -338,8 +340,8 @@ var dto = JsonSerializer.Deserialize<UpdateProfileRequest>(body, options);
 Unmarshal into typed structs. Disallow unknown fields for strict parsing.
 
 ```go
-func updatePrefs(w http.ResponseWriter, r *http.Request) {
-    var req SettingsRequest
+func relayWebhook(w http.ResponseWriter, r *http.Request) {
+    var req InvoiceWebhookRequest
     dec := json.NewDecoder(r.Body)
     dec.DisallowUnknownFields()
     if err := dec.Decode(&req); err != nil {
@@ -347,8 +349,8 @@ func updatePrefs(w http.ResponseWriter, r *http.Request) {
         return
     }
     payload, _ := json.Marshal(map[string]interface{}{
-        "color": req.Color,
-        "uid":   userIDFromSession(r),
+        "memo":       req.Memo,
+        "invoice_id": req.InvoiceID,
     })
     w.Write(payload)
 }

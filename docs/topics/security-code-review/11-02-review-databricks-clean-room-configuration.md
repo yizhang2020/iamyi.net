@@ -82,9 +82,15 @@ HAVING COUNT(*) >= 1;
 
 Group size of one reveals individual-level rows when output validation is missing.
 
-### Example 5: Shared admin PAT across rooms
+### Example 3: Long-lived personal access token in CI
 
-One personal access token runs jobs for multiple clean rooms with different data classifications—cross-room credential bleed.
+```yaml
+# .github/workflows/clean-room.yml
+env:
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_ADMIN_PAT }}
+```
+
+One admin PAT runs scheduled jobs for every clean room classification—cross-room credential bleed when the workflow file is reused.
 
 ## SDK/IaC Sinks and Dangerous Patterns
 

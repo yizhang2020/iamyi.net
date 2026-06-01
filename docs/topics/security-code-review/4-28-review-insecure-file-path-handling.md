@@ -134,21 +134,24 @@ readfile('/var/docs/' . $_GET['doc']);
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, request
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
-app = Flask(__name__)
+app = FastAPI()
+AVATAR_ROOT = Path("/var/data/avatars")
 
-@app.route("/get_file")
-def get_file():
-    filename = request.args.get("file")
-    # Sink: user input concatenated into path without containment check
-    return open(f"/var/www/uploads/{filename}", "r").read()
+@app.get("/avatars/raw")
+def avatar_raw(name: str):
+    # Sink: user input joined into path without containment check
+    target = AVATAR_ROOT / name
+    return PlainTextResponse(target.read_text(encoding="utf-8", errors="ignore"))
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find user-influenced path parameters.** Search for `file`, `filename`, `path`, and similar names before file API calls.
-2. **Trace the Python download handler.** In the sample, `../../../etc/passwd` escapes the upload folder. Canonical containment is required.
+2. **Trace the avatar raw download.** In the sample, `../../../etc/passwd` escapes `AVATAR_ROOT` without a resolved containment check.
 3. **Inspect path joins.** `Paths.get(base, userInput)` without resolve check is a common pattern in Java and Python.
 4. **Check denylist-only validation.** `if ".." in name` without comparing canonical paths fails on encoded dots and absolute paths.
 5. **Review write paths.** Upload and export handlers must confine writes the same way as reads.
@@ -231,23 +234,22 @@ Resolve paths and verify they stay under the upload root. Prefer `send_from_dire
 ```python
 from pathlib import Path
 
-from flask import Flask, abort, request, send_from_directory
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
-UPLOAD_FOLDER = Path("/var/www/uploads").resolve()
+app = FastAPI()
+AVATAR_ROOT = Path("/var/data/avatars").resolve()
 
-@app.route("/get_file")
-def get_file():
-    name = secure_filename(request.args.get("file", ""))
-    if not name:
-        abort(400)
-    target = (UPLOAD_FOLDER / name).resolve()
-    if not target.is_relative_to(UPLOAD_FOLDER):
-        abort(403)
-    if not target.is_file():
-        abort(404)
-    return send_from_directory(UPLOAD_FOLDER, name, as_attachment=True)
+@app.get("/avatars/{name}")
+def avatar(name: str):
+    safe = secure_filename(name)
+    if not safe:
+        raise HTTPException(status_code=400)
+    target = (AVATAR_ROOT / safe).resolve()
+    if not target.is_relative_to(AVATAR_ROOT) or not target.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(target)
 ```
 
 **Important:** `secure_filename` alone is not enough. Always verify resolved path containment.

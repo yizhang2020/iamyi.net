@@ -89,9 +89,10 @@ Any server-side HTTP client that accepts a user-influenced URL or host is a revi
 ### Python
 
 ```python
-requests.get(user_url, allow_redirects=True)
-urllib.request.urlopen(image_url)
-httpx.AsyncClient().get(webhook_target)
+urllib.request.urlopen(body["callback_url"])
+async with aiohttp.ClientSession() as s:
+    await s.get(webhook_target, allow_redirects=True)
+requests.post(import_src, data=form)  # when import_src is user JSON field
 ```
 
 `aiohttp`, `selenium` with user URLs, PDF renderers that fetch remote assets.
@@ -117,16 +118,16 @@ WebClient.DownloadString(imageUrl);
 ### JavaScript (Node.js)
 
 ```javascript
-const res = await fetch(req.query.url);
-axios.get(req.body.webhook);
-https.get(userProvidedUrl, (r) => { ... });
+const res = await fetch(req.body.callbackUrl);
+axios.post(req.body.webhook, { ping: true });
+https.get(userProvidedHost, (r) => { ... });
 ```
 
 ### Go
 
 ```go
-resp, err := http.Get(r.URL.Query().Get("url"))
-client.Get(userURL)
+resp, err := http.PostForm(r.FormValue("callback_url"), nil)
+client.Get(r.URL.Query().Get("fetch"))
 ```
 
 ### Shell and integration scripts
@@ -139,23 +140,26 @@ wget -O- "$WEBHOOK"
 ## Sample Vulnerable Code in Python
 
 ```python
-import requests
+import urllib.request
+import json
 from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/avatar/import")
-def import_avatar():
-    # Attacker-controlled URL fetched from the server's network position
-    image_url = request.args.get("url")
-    resp = requests.get(image_url, timeout=5)
-    return resp.content, 200, {"Content-Type": resp.headers.get("Content-Type", "image/png")}
+@app.route("/integrations/webhook-test", methods=["POST"])
+def webhook_test():
+    # Attacker POSTs {"callback_url":"http://169.254.169.254/..."} from server network position
+    payload = request.get_json(force=True)
+    callback = payload["callback_url"]
+    with urllib.request.urlopen(callback, timeout=5) as resp:
+        body = resp.read(65536)
+    return body, 200, {"Content-Type": resp.headers.get("Content-Type", "text/plain")}
 ```
 
 ## Step-by-Step Review Walkthrough
 
-1. **Find server-side HTTP clients.** Search for `requests.get`, `urllib`, `httpx`, or similar with user-influenced URLs.
-2. **Trace the Python avatar import.** In the sample, any URL the server can reach—including internal metadata—is returned to the caller.
+1. **Find server-side HTTP clients.** Search for `urllib`, `aiohttp`, `HttpURLConnection`, or similar with user-influenced URLs.
+2. **Trace the Python webhook test handler.** In the sample, any URL the server can reach—including internal metadata—is returned to the caller.
 3. **Identify URL assembly patterns.** Flag base URLs like `http://127.0.0.1` plus attacker path segments.
 4. **Review redirect defaults.** Libraries that follow 302 responses can pivot from a public first hop to an internal target.
 5. **Check DNS resolution timing.** Validate resolved IPs against private ranges after lookup, not only the hostname string.
@@ -217,19 +221,17 @@ public async Task<IActionResult> Import([FromBody] ImportRequest req)
 ### Go
 
 ```go
-func avatarImport(w http.ResponseWriter, r *http.Request) {
-    imageURL := r.URL.Query().Get("url")
-    resp, err := http.Get(imageURL)
+func webhookTest(w http.ResponseWriter, r *http.Request) {
+    var body struct {
+        CallbackURL string `json:"callback_url"`
+    }
+    json.NewDecoder(r.Body).Decode(&body)
+    resp, err := http.Get(body.CallbackURL)
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadGateway)
         return
     }
     defer resp.Body.Close()
-    io.Copy(w, resp.Body)
-}
-
-func metadataProbe(w http.ResponseWriter, r *http.Request) {
-    resp, _ := http.Get("http://169.254.169.254/latest/meta-data/iam/security-credentials/")
     io.Copy(w, resp.Body)
 }
 ```
@@ -268,13 +270,13 @@ def safe_fetch(url: str) -> bytes:
     chunk = next(resp.iter_content(8192))
     return chunk
 
-@app.route("/avatar/import")
-def import_avatar():
+@app.route("/integrations/webhook-test")
+def webhook_test():
     try:
-        data = safe_fetch(request.args["url"])
+        data = safe_fetch(request.json["callback_url"])
     except ValueError:
         abort(400)
-    return data, 200, {"Content-Type": "image/png"}
+    return data, 200, {"Content-Type": "application/octet-stream"}
 ```
 
 **Important:** Pass opaque server-side IDs to background jobs instead of raw user URLs when possible.

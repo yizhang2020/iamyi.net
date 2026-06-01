@@ -83,13 +83,13 @@ Any outbound request built from user input needs allowlisting, DNS rebinding awa
 ### Python
 
 ```python
-import requests, urllib.request
-requests.get(user_url, allow_redirects=True)
-urllib.request.urlopen(attacker_url)
-httpx.AsyncClient().get(url_from_body)
+import httpx, urllib.request
+httpx.Client(follow_redirects=True).get(user_link)
+urllib.request.urlopen(preview_target)
+requests.post(webhook_url, json={"ping": True})  # when URL is user-supplied
 ```
 
-Also: `aiohttp`, `selenium`/`playwright` navigation to user URLs, PDF renderers fetching remote HTML.
+Also: `aiohttp` session fetches, `selenium`/`playwright` navigation to user URLs, PDF renderers fetching remote HTML.
 
 ### Java
 
@@ -123,8 +123,8 @@ await fetch(userUrl);
 ### Go
 
 ```go
-http.Get(userURL)
-client.Do(req) // req.URL from JSON body
+http.Get(r.URL.Query().Get("link"))
+client.Do(req) // req built from ?link= query param
 ```
 
 `net/http`, custom TCP dialers, gRPC gateways that proxy to user hostnames.
@@ -139,17 +139,18 @@ Net::HTTP.get(URI(user_url))
 ## Sample Vulnerable Code in Python
 
 ```python
-import requests
-from flask import Flask, request
+import httpx
+from flask import Flask, request, Response
 
 app = Flask(__name__)
 
-@app.route("/preview")
-def preview():
-    # Attacker supplies http://169.254.169.254/... or http://127.0.0.1:6379/
-    target = request.args.get("url")
-    resp = requests.get(target, timeout=5, allow_redirects=True)
-    return resp.text
+@app.route("/images/thumbnail")
+def thumbnail():
+    # Attacker supplies src=http://169.254.169.254/... or http://127.0.0.1:6379/
+    image_url = request.args.get("src")
+    with httpx.Client(follow_redirects=True, timeout=5.0) as client:
+        resp = client.get(image_url)
+    return Response(resp.content, mimetype=resp.headers.get("content-type", "image/jpeg"))
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -179,42 +180,45 @@ def preview():
 ### Java
 
 ```java
-@PostMapping("/fetch")
-public String fetchEndpoint(@RequestBody Map<String, String> body) throws Exception {
-    String endpoint = body.get("endpoint");
-    URL url = new URL("http://127.0.0.1" + endpoint);
+@GetMapping("/images/thumbnail")
+public ResponseEntity<byte[]> thumbnail(@RequestParam String src) throws Exception {
+    URL url = new URL(src);
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setRequestMethod("GET");
-    try (BufferedReader reader = new BufferedReader(
-            new InputStreamReader(conn.getInputStream()))) {
-        return reader.lines().collect(Collectors.joining());
+    byte[] body;
+    try (InputStream in = conn.getInputStream()) {
+        body = in.readAllBytes();
     }
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(conn.getContentType()))
+        .body(body);
 }
 ```
 
 ### C#
 
 ```csharp
-[HttpPost("import")]
-public async Task<IActionResult> ImportFromUrl([FromBody] ImportRequest req)
+[HttpGet("images/thumbnail")]
+public async Task<IActionResult> Thumbnail([FromQuery] string src)
 {
     using var client = new HttpClient();
-    var html = await client.GetStringAsync(req.Url);
-    return Ok(_parser.Parse(html));
+    var bytes = await client.GetByteArrayAsync(src);
+    return File(bytes, "image/jpeg");
 }
 ```
 
 ### Go
 
 ```go
-func proxy(w http.ResponseWriter, r *http.Request) {
-    raw := r.URL.Query().Get("u")
-    resp, err := http.Get(raw)
+func fetchThumbnail(w http.ResponseWriter, r *http.Request) {
+    src := r.URL.Query().Get("src")
+    resp, err := http.Get(src)
     if err != nil {
         http.Error(w, err.Error(), 500)
         return
     }
     defer resp.Body.Close()
+    w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
     io.Copy(w, resp.Body)
 }
 ```
@@ -231,28 +235,28 @@ import socket
 from urllib.parse import urlparse
 import requests
 
-ALLOWED_HOSTS = {"cdn.example.com", "api.partner.com"}
+ALLOWED_IMAGE_HOSTS = {"images.example.com", "cdn.partner.com"}
 
 def is_public_ip(hostname: str) -> bool:
     addr = socket.gethostbyname(hostname)
     ip = ipaddress.ip_address(addr)
     return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved)
 
-def safe_fetch(url: str) -> str:
+def safe_fetch_image(url: str) -> bytes:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError("scheme not allowed")
-    if parsed.hostname not in ALLOWED_HOSTS:
+    if parsed.hostname not in ALLOWED_IMAGE_HOSTS:
         raise ValueError("host not allowlisted")
     if not is_public_ip(parsed.hostname):
         raise ValueError("destination not public")
     resp = requests.get(url, timeout=5, allow_redirects=False)
     resp.raise_for_status()
-    return resp.text
+    return resp.content
 
-@app.route("/preview")
-def preview():
-    return safe_fetch(request.args["url"])
+@app.route("/images/thumbnail")
+def thumbnail():
+    return Response(safe_fetch_image(request.args["src"]), mimetype="image/jpeg")
 ```
 
 **Important:** Wrap fetches in a separate network segment with no internal access when possible. Use IMDSv2 on AWS to reduce metadata abuse.
@@ -263,14 +267,15 @@ Map user choices to predefined base URLs. Resolve DNS and verify the resulting I
 
 ```java
 private static final Map<String, String> ALLOWED = Map.of(
-    "partner", "https://api.partner.com/v1/report");
+    "logo", "https://cdn.partner.com/assets/logo.png",
+    "banner", "https://cdn.partner.com/assets/banner.png");
 
-public String fetchReport(String sourceKey) throws Exception {
-    String base = ALLOWED.get(sourceKey);
-    if (base == null) {
-        throw new SecurityException("unknown source");
+public byte[] fetchThumbnail(String assetKey) throws Exception {
+    String url = ALLOWED.get(assetKey);
+    if (url == null) {
+        throw new SecurityException("unknown asset");
     }
-    URI uri = URI.create(base);
+    URI uri = URI.create(url);
     InetAddress addr = InetAddress.getByName(uri.getHost());
     if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()) {
         throw new SecurityException("blocked destination");
@@ -279,7 +284,7 @@ public String fetchReport(String sourceKey) throws Exception {
         .followRedirects(HttpClient.Redirect.NEVER)
         .build();
     HttpRequest req = HttpRequest.newBuilder(uri).GET().build();
-    return client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+    return client.send(req, HttpResponse.BodyHandlers.ofByteArray()).body();
 }
 ```
 
@@ -290,10 +295,10 @@ public String fetchReport(String sourceKey) throws Exception {
 Use a custom `DelegatingHandler` that rejects non-public destinations after DNS resolve.
 
 ```csharp
-public async Task<string> ImportFromCatalog(string resourceId)
+public async Task<byte[]> FetchApprovedAsset(string assetId)
 {
-    var url = _catalog.GetApprovedUrl(resourceId);
-    if (url is null) throw new SecurityException("unknown resource");
+    var url = _assetCatalog.GetApprovedUrl(assetId);
+    if (url is null) throw new SecurityException("unknown asset");
 
     var host = new Uri(url).Host;
     var addresses = await Dns.GetHostAddressesAsync(host);
@@ -304,7 +309,7 @@ public async Task<string> ImportFromCatalog(string resourceId)
     }
 
     using var client = new HttpClient(new SsrSafeHandler()) { Timeout = TimeSpan.FromSeconds(5) };
-    return await client.GetStringAsync(url);
+    return await client.GetByteArrayAsync(url);
 }
 
 private static bool IsPrivate(IPAddress ip) =>
@@ -318,11 +323,11 @@ private static bool IsPrivate(IPAddress ip) =>
 Custom `Transport.DialContext` refuses private IPs. Allowlist permitted webhook hosts.
 
 ```go
-var allowedHosts = map[string]bool{"webhook.partner.com": true}
+var allowedImageHosts = map[string]bool{"images.example.com": true, "cdn.partner.com": true}
 
-func safeGet(raw string) ([]byte, error) {
+func safeFetchThumbnail(raw string) ([]byte, error) {
     u, err := url.Parse(raw)
-    if err != nil || u.Scheme != "https" || !allowedHosts[u.Hostname()] {
+    if err != nil || u.Scheme != "https" || !allowedImageHosts[u.Hostname()] {
         return nil, fmt.Errorf("url not allowed")
     }
     addrs, err := net.LookupHost(u.Hostname())

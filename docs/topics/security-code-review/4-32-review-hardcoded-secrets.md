@@ -147,13 +147,13 @@ AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 def admin_sync():
     api_key = request.headers.get("X-API-Key")
     # Hardcoded bypass key grants admin access without user authentication
-    if api_key == "internal-sync-key-2024":
+    if api_key == "nightly-etl-bypass-7k9m":
         return admin_dashboard()
     return "", 403
 
 def sign_token(payload: dict) -> str:
     # JWT signing key embedded in source — cannot rotate without redeploy
-    return jwt.encode(payload, "super-secret-key-not-for-production", algorithm="HS256")
+    return jwt.encode(payload, "prod-jwt-hmac-static-v3", algorithm="HS256")
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -193,28 +193,28 @@ optionalUser.ifPresent(user -> {
 
 @GetMapping("/admin/sync")
 public ResponseEntity<?> adminSync(@RequestHeader("X-API-Key") String apiKey) {
-    if ("internal-sync-key-2024".equals(apiKey)) {
+    if ("partner-export-static-key".equals(apiKey)) {
         return ResponseEntity.ok(adminDashboard());
     }
     return ResponseEntity.status(403).build();
 }
 
-private static final String STRIPE_SECRET = "sk_live_abc123xyz";
+private static final String SENDGRID_SECRET = "SG.hardcoded-mail-api-key";
 String jwt = Jwts.builder()
-    .signWith(SignatureAlgorithm.HS256, "super-secret-key-not-for-production".getBytes())
+    .signWith(SignatureAlgorithm.HS256, "legacy-reporting-jwt-salt".getBytes())
     .compact();
 ```
 
 ### C#
 
 ```csharp
-private const string AdminSyncKey = "internal-sync-key-2024";
-private const string JwtSigningKey = "super-secret-key-not-for-production";
+private const string WebhookVerifyKey = "stripe-whsec_hardcoded_in_repo";
+private const string JwtSigningKey = "invoice-service-hs256-key";
 
 [HttpGet("admin/sync")]
 public IActionResult AdminSync()
 {
-    if (Request.Headers["X-API-Key"] == AdminSyncKey)
+    if (Request.Headers["X-API-Key"] == WebhookVerifyKey)
         return Ok(adminDashboard());
     return Forbid();
 }
@@ -231,12 +231,12 @@ public string CreateToken(ClaimsIdentity identity)
 
 ```go
 const (
-    internalAPIKey = "internal-sync-key-2024"
-    jwtSecret      = "super-secret-key-not-for-production"
+    metricsScrapeKey = "prom-scrape-bypass-static"
+    jwtSecret        = "analytics-export-signing-key"
 )
 
 func adminSync(w http.ResponseWriter, r *http.Request) {
-    if r.Header.Get("X-API-Key") == internalAPIKey {
+        if r.Header.Get("X-API-Key") == metricsScrapeKey {
         adminDashboard(w, r)
         return
     }

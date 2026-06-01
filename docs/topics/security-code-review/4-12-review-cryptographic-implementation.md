@@ -38,36 +38,36 @@ Use these patterns in authorized tests and code search. They are not injection s
 ### Pattern 1: Weak password hashing (MD5, SHA1, unsalted SHA-256)
 
 ```text
-register("alice", "P@ssw0rd123")
-# Stored: 482c811da5d5b4bc6d497ffa98491e38  (MD5 — crackable offline)
+createApiKey("billing-bot", "s3cr3t-k3y")
+# Stored: 5ebe2294ecd0e0f08eabebfd92c7820cd8881592  (SHA1 — crackable offline)
 ```
 
 ### Pattern 2: TLS verification disabled (`verify=False`)
 
 ```python
-requests.get("https://partner.example/report", verify=False)
-# MITM can replace response or steal bearer tokens in transit
+httpx.get("https://payments.example/webhook", verify=False)
+# MITM can replace response or steal HMAC secrets in transit
 ```
 
 ### Pattern 3: ECB mode and static IV (pattern leakage)
 
 ```text
-# Two blocks of identical plaintext produce identical ciphertext blocks
-encrypt_ecb(b"alice@corp.com    ")  # 16-byte aligned repeats visible in output
+# Two blocks of identical PAN digits produce identical ciphertext blocks
+encrypt_ecb(b"4111111111111111")  # card numbers with repeated digits leak structure
 ```
 
 ### Pattern 4: Hardcoded or default keys in source
 
 ```text
-SECRET_KEY = "changeme"
-JWT signing with dev key shipped to production
+WEBHOOK_SIGNING_KEY = "dev-signing-key"
+JWT signing with staging secret shipped to production
 ```
 
 ### Pattern 5: Custom XOR or “obfuscation” treated as encryption
 
 ```text
-def protect(s): return ''.join(chr(ord(c) ^ 0x5A) for c in s)
-# Trivially reversible; not a substitute for AES-GCM or envelope encryption
+def mask_pan(p): return ''.join(chr(ord(c) ^ 0x42) for c in p)
+# Trivially reversible; not a substitute for AES-GCM or tokenization
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -132,23 +132,23 @@ SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
 
 ```python
 import hashlib
-import requests
+import httpx
 
-SECRET_KEY = "dev-only-change-me"
-PASSWORD_STORE = {}
+WEBHOOK_SIGNING_KEY = "dev-only-signing-key"
+API_KEY_STORE = {}
 
-def register(username, password):
-    # MD5 is not a password hash; no salt
-    PASSWORD_STORE[username] = hashlib.md5(password.encode()).hexdigest()
+def create_api_key(client_name, secret):
+    # SHA1 is not a password hash; no salt or slow hash
+    API_KEY_STORE[client_name] = hashlib.sha1(secret.encode()).hexdigest()
 
-def save_customer_ssn(user_id, ssn):
-    # Sensitive data written to disk in cleartext
-    with open(f"/var/data/{user_id}.dat", "w") as f:
-        f.write(ssn)
+def store_payment_token(user_id, pan):
+    # Sensitive card data written to disk in cleartext
+    with open(f"/var/data/tokens/{user_id}.txt", "w") as f:
+        f.write(pan)
 
-def fetch_partner_report(url):
+def deliver_webhook(url, payload):
     # TLS verification disabled; attacker can MITM
-    return requests.get(url, verify=False, timeout=10).text
+    return httpx.post(url, content=payload, verify=False, timeout=10).text
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -178,10 +178,10 @@ def fetch_partner_report(url):
 ### Java
 
 ```java
-public class ApiClient {
-    private static final String API_KEY = "sk_live_abc123";
+public class WebhookClient {
+    private static final String HMAC_SECRET = "wh_live_abc123";
 
-    public String fetch(String url) throws Exception {
+    public String post(String url, byte[] body) throws Exception {
         TrustManager[] trustAll = { new X509TrustManager() {
             public void checkClientTrusted(X509Certificate[] c, String a) {}
             public void checkServerTrusted(X509Certificate[] c, String a) {}
@@ -191,7 +191,7 @@ public class ApiClient {
         ctx.init(null, trustAll, new SecureRandom());
         HttpsURLConnection conn = (HttpsURLConnection) new URL(url).openConnection();
         conn.setSSLSocketFactory(ctx.getSocketFactory());
-        conn.setRequestProperty("Authorization", "Bearer " + API_KEY);
+        conn.setRequestProperty("X-Signature", hmacSha1(body, HMAC_SECRET));
         return new String(conn.getInputStream().readAllBytes());
     }
 }
@@ -200,31 +200,33 @@ public class ApiClient {
 ### C#
 
 ```csharp
-public string Protect(string plaintext)
+public string TokenizePan(string pan)
 {
-    var key = Encoding.UTF8.GetBytes("My16ByteKey!!!!!");
+    var key = Encoding.UTF8.GetBytes("Static16ByteKey!");
     using var aes = Aes.Create();
     aes.Key = key;
     aes.Mode = CipherMode.ECB;
     aes.Padding = PaddingMode.PKCS7;
     using var enc = aes.CreateEncryptor();
     return Convert.ToBase64String(enc.TransformFinalBlock(
-        Encoding.UTF8.GetBytes(plaintext), 0, plaintext.Length));
+        Encoding.UTF8.GetBytes(pan), 0, pan.Length));
 }
 ```
 
 ### Go
 
 ```go
-func hashPassword(pw string) string {
-    h := sha1.Sum([]byte(pw))
+func hashApiSecret(secret string) string {
+    h := md5.Sum([]byte(secret))
     return hex.EncodeToString(h[:])
 }
 
-func downloadReport(url string) ([]byte, error) {
+func postWebhook(url string, body []byte) ([]byte, error) {
     tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
     client := &http.Client{Transport: tr}
-    resp, err := client.Get(url)
+    req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+    req.Header.Set("X-Signature", signHmacMD5(body, os.Getenv("DEV_HMAC")))
+    resp, err := client.Do(req)
     if err != nil {
         return nil, err
     }
@@ -243,21 +245,21 @@ Load secrets from the environment and fail fast when missing. Use slow password 
 import os
 from argon2 import PasswordHasher
 from cryptography.fernet import Fernet
-import requests
+import httpx
 
 ph = PasswordHasher()
-FERNET_KEY = os.environ["APP_FERNET_KEY"].encode()
+FERNET_KEY = os.environ["TOKEN_VAULT_KEY"].encode()
 fernet = Fernet(FERNET_KEY)
 
-def register(username, password):
-    PASSWORD_STORE[username] = ph.hash(password)
+def create_api_key(client_name, secret):
+    API_KEY_STORE[client_name] = ph.hash(secret)
 
-def save_customer_ssn(user_id, ssn):
-    token = fernet.encrypt(ssn.encode())
-    db.execute("UPDATE users SET ssn_enc = ? WHERE id = ?", (token, user_id))
+def store_payment_token(user_id, pan):
+    token = fernet.encrypt(pan.encode())
+    db.execute("UPDATE users SET pan_token = ? WHERE id = ?", (token, user_id))
 
-def fetch_partner_report(url):
-    return requests.get(url, verify=True, timeout=10).text
+def deliver_webhook(url, payload):
+    return httpx.post(url, content=payload, verify=True, timeout=10).text
 ```
 
 **Important:** Never commit production keys. Use `ssl.create_default_context()` for custom TLS clients and enforce TLS 1.2+.

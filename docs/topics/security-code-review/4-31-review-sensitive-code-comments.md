@@ -37,8 +37,8 @@ Use repository search and page-source review—these are disclosure abuse scenar
 ### Pattern 1: Credentials in source comments
 
 ```python
-# TODO: remove before prod — admin password is 'Winter2024!'
-# API key for staging: sk_test_EXAMPLE_NOT_A_REAL_KEY_xxxxxxxx
+# FIXME: staging webhook uses shared secret 'wh_staging_4b7n' until vault is wired
+# Datadog key for on-call dashboard: dd_api_EXAMPLE_PLACEHOLDER_xxxxxxxx
 ```
 
 ### Pattern 2: Authentication bypass hints
@@ -145,8 +145,8 @@ TODO|FIXME|HACK|XXX|backdoor|bypass|disable.*auth
 
 ```python
 def verify_admin(user, password):
-    # Backdoor for QA — remove before launch (still here in prod)
-    if password == "qa_override_2024":
+    # QA-only master override documented in runbook INC-4421 — remove before GA
+    if password == "qa_master_override_inc4421":
         return True
     return check_password_hash(user.password_hash, password)
 ```

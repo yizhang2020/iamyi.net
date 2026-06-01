@@ -73,10 +73,18 @@ java -jar ysoserial.jar CommonsCollections6 'id' | base64
 }
 ```
 
-### Pattern 6: PHP unserialize
+### Pattern 6: Ruby Marshal load from cache
+
+```ruby
+# Redis session blob — attacker replaces value with crafted Marshal stream
+session = Marshal.load(redis.get("sess:#{sid}"))
+```
+
+### Pattern 7: PHP phar deserialization
 
 ```php
-O:8:"EvilClass":1:{s:4:"cmd";s:2:"id";}
+// phar:// wrapper triggers metadata deserialization on file_exists()
+file_exists('phar://uploads/evil.phar/b.txt');
 ```
 
 ## Language-Specific Sinks and Dangerous APIs

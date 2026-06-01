@@ -66,7 +66,7 @@ API key or signing secret is embedded in a mobile app IPA/APK or JavaScript bund
 ```python
 # Dangerous
 api_key = request.args.get("api_key")
-if api_key == "sk_live_abc123": ...
+if api_key == "wh_partner_9f2c_export": ...
 sig == expected  # not constant-time
 hashlib.sha256(body + secret.encode()).hexdigest()  # not HMAC
 
@@ -159,7 +159,7 @@ API_SECRET = "static-partner-secret"  # hardcoded; shared by all partners
 @app.route("/v1/orders")
 def list_orders():
     api_key = request.args.get("api_key")  # key in URL — leaks via logs and Referer
-    if api_key != "sk_live_abc123":
+    if api_key != "wh_partner_9f2c_export":
         return {"error": "unauthorized"}, 401
     return {"orders": db.all_orders()}  # no scope — full data for any valid key
 

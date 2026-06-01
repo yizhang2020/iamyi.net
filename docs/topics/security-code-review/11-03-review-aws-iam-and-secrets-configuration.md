@@ -60,16 +60,21 @@ One compromised workload may read all buckets, fetch all secrets, and pass admin
 
 Any principal that can satisfy optional conditions—or none—may assume the role.
 
-### Example 3: Long-lived access key in source
+### Example 3: Long-lived access key in ECS task definition
 
-```python
-boto3.client("s3",
-    aws_access_key_id="AKIAIOSFODNN7EXAMPLE",
-    aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-)
+```json
+{
+  "containerDefinitions": [{
+    "name": "api",
+    "environment": [
+      { "name": "AWS_ACCESS_KEY_ID", "value": "AKIAIOSFODNN7EXAMPLE" },
+      { "name": "AWS_SECRET_ACCESS_KEY", "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" }
+    ]
+  }]
+}
 ```
 
-Keys in git history remain valid until rotated; scanners harvest them continuously.
+Task definition in git exposes keys to anyone with repo access; prefer `taskRoleArn` instead.
 
 ### Example 4: Secrets Manager without rotation
 

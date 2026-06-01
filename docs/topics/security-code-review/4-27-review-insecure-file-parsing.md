@@ -135,22 +135,25 @@ unzip(file, dest_dir);  // no canonical path check
 ## Sample Vulnerable Code in Python
 
 ```python
-import yaml
-from flask import Flask, request
+import zipfile
+from io import BytesIO
+from fastapi import FastAPI, File, UploadFile
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.post("/import")
-def import_config():
-    data = request.files["file"].read()
-    # Unsafe: yaml.load can construct arbitrary Python objects
-    return yaml.load(data)
+@app.post("/packages/import")
+async def import_package(file: UploadFile = File(...)):
+    data = await file.read()
+    # Unsafe: extracts member paths without zip-slip containment check
+    with zipfile.ZipFile(BytesIO(data)) as zf:
+        zf.extractall("/var/import/incoming")
+    return {"status": "imported"}
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Inventory parsers.** List ZIP, TAR, XML, JSON with type tags, YAML, pickle, Java serialization, PDF, and image libraries in the change.
-2. **Trace the Python YAML import.** In the sample, `yaml.load` without a safe loader enables arbitrary object construction from untrusted bytes.
+2. **Trace the zip package import.** In the sample, `extractall` without path containment enables zip-slip writes outside `/var/import/incoming`.
 3. **Check default parser settings.** Many XML and YAML loaders enable dangerous features unless explicitly disabled.
 4. **Review archive extraction.** Paths containing `..` or absolute paths can escape the target directory (Zip Slip).
 5. **Inspect limits on depth and size.** Cap compressed size, file count, and expanded bytes before parsing continues.

@@ -70,12 +70,16 @@ Access token lifetime is 30 days with `roles: ["admin"]` inside. Admin lockout o
 jwt.encode({"sub": uid, "admin": True, "exp": now + timedelta(days=7)}, SECRET, algorithm="HS256")
 jwt.decode(token, SECRET, algorithms=["HS256", "none"])  # resource server
 
-# Safer: authlib.jose RS256 + JWKS endpoint; PyJWT with explicit algorithms
-from authlib.jose import jwt as jose_jwt
-access = jose_jwt.encode({"alg": "RS256", "kid": kid}, claims, private_key)
-# Resource server: fetch JWKS, require aud/iss/exp
+# Safer: PyJWT RS256 + JWKS endpoint for resource servers
 import jwt as pyjwt
-pyjwt.decode(token, key=public_key, algorithms=["RS256"], audience="api.example.com", issuer="https://auth.example.com")
+from jwt import PyJWKClient
+
+jwks_client = PyJWKClient("https://auth.example.com/.well-known/jwks.json")
+signing_key = jwks_client.get_signing_key_from_jwt(raw_token)
+pyjwt.decode(
+    raw_token, signing_key.key, algorithms=["RS256"],
+    audience="api.example.com", issuer="https://auth.example.com",
+)
 ```
 
 Also review: `python-jose` `jwt.decode` defaults, `flask-jwt-extended` configuration.
@@ -132,7 +136,7 @@ jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(os.Getenv(
 token, err := jwt.Parse(raw, jwt.WithKeySet(jwkSet), jwt.WithAudience("api.example.com"), jwt.WithIssuer("https://auth.example.com"))
 ```
 
-See [Authlib JOSE](https://docs.authlib.org/en/latest/jose/index.html), [jjwt](https://github.com/jwtk/jjwt), [RFC 8725 JWT BCP](https://www.rfc-editor.org/rfc/rfc8725), and [lestrrat-go/jwx](https://pkg.go.dev/github.com/lestrrat-go/jwx/v2).
+See [PyJWT](https://pyjwt.readthedocs.io/), [jjwt](https://github.com/jwtk/jjwt), [RFC 8725 JWT BCP](https://www.rfc-editor.org/rfc/rfc8725), and [lestrrat-go/jwx](https://pkg.go.dev/github.com/lestrrat-go/jwx/v2).
 
 ## Sample Vulnerable Code in Python
 
@@ -272,38 +276,55 @@ func jwksHandler(w http.ResponseWriter, r *http.Request) {
 
 ### Python
 
-Sign with RS256 and expose JWKS. Rotate refresh tokens and detect reuse.
+Sign with RS256 using PyJWT and expose JWKS. Rotate refresh tokens and detect reuse.
 
 ```python
-from authlib.jose import JsonWebKey, jwt as jose_jwt
-from cryptography.hazmat.primitives import serialization
+import jwt as pyjwt
 import secrets
 import time
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 PRIVATE_KEY = load_private_key_from_kms()
-JWK = JsonWebKey.import_key(PRIVATE_KEY.public_key(), {"kid": "2026-05-key-1", "use": "sig", "alg": "RS256"})
+PUBLIC_KEY = PRIVATE_KEY.public_key()
+KID = "2026-05-key-1"
 
 def issue_tokens(user_id: str, scopes: list[str], refresh_family: str | None = None) -> dict:
     now = int(time.time())
-    access = jose_jwt.encode(
-        {"header": {"alg": "RS256", "kid": JWK["kid"], "typ": "JWT"}},
-        {"iss": "https://auth.example.com", "sub": user_id, "aud": "api.example.com",
-         "scope": " ".join(scopes), "iat": now, "exp": now + 900},
+    access = pyjwt.encode(
+        {
+            "iss": "https://auth.example.com",
+            "sub": user_id,
+            "aud": "api.example.com",
+            "scope": " ".join(scopes),
+            "iat": now,
+            "exp": now + 900,
+        },
         PRIVATE_KEY,
+        algorithm="RS256",
+        headers={"kid": KID},
     )
     family = refresh_family or secrets.token_urlsafe(16)
     refresh_jti = secrets.token_urlsafe(16)
-    refresh = jose_jwt.encode(
-        {"header": {"alg": "RS256", "kid": JWK["kid"]}},
-        {"iss": "https://auth.example.com", "sub": user_id, "aud": "auth.example.com",
-         "jti": refresh_jti, "family": family, "iat": now, "exp": now + 604800},
+    refresh = pyjwt.encode(
+        {
+            "iss": "https://auth.example.com",
+            "sub": user_id,
+            "aud": "auth.example.com",
+            "jti": refresh_jti,
+            "family": family,
+            "iat": now,
+            "exp": now + 604800,
+        },
         PRIVATE_KEY,
+        algorithm="RS256",
+        headers={"kid": KID},
     )
     store_refresh(refresh_jti, family, user_id)
-    return {"access_token": access.decode(), "refresh_token": refresh.decode()}
+    return {"access_token": access, "refresh_token": refresh}
 
 def refresh_tokens(presented_refresh: str) -> dict:
-    claims = validate_refresh(presented_refresh)  # RS256 + iss/aud/exp/jti
+    claims = validate_refresh(presented_refresh)  # RS256 + iss/aud/exp/jti via PyJWT
     if is_refresh_reused(claims["jti"], claims["family"]):
         revoke_family(claims["family"])
         raise AuthError("refresh reuse detected")
@@ -425,7 +446,8 @@ func validateAccess(raw string) (jwt.MapClaims, error) {
 - [OAuth 2.0 Authorization Framework — Refresh Token](https://www.rfc-editor.org/rfc/rfc6749#section-1.5)
 - [OAuth 2.0 Token Exchange and Rotation Practices (RFC 9700 BCP)](https://datatracker.ietf.org/doc/html/rfc9700)
 - [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)
-- [Authlib JOSE documentation](https://docs.authlib.org/en/latest/jose/index.html)
+- [PyJWT documentation](https://pyjwt.readthedocs.io/)
+- [PyJWT PyJWKClient](https://pyjwt.readthedocs.io/en/stable/usage.html#retrieve-rsa-signing-key-from-jwks-endpoint)
 - [Spring Authorization Server](https://docs.spring.io/spring-authorization-server/reference/index.html)
 - [Microsoft identity — Token validation](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens)
 - [lestrrat-go/jwx](https://pkg.go.dev/github.com/lestrrat-go/jwx/v2)

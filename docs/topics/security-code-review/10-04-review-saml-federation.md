@@ -92,7 +92,7 @@ http.saml2Login(Customizer.withDefaults());
 // RelyingPartyRegistration.fromMetadataLocation(...).entityId(...).assertionConsumerServiceLocation(...)
 ```
 
-Also review: OpenSAML low-level usage without validation, Pac4j misconfiguration.
+Also review: OpenSAML low-level usage without validation, Pac4j `SAML2Client` misconfiguration, Shibboleth SP `MetadataProvider` accepting unsigned metadata.
 
 ### C#
 

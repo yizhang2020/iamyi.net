@@ -283,25 +283,24 @@ Use least-privilege roles, narrow network policies, row access policies for mult
 ```sql
 CREATE NETWORK POLICY corp_egress_only
   ALLOWED_IP_LIST = ('203.0.113.0/24', '198.51.100.10');
+ALTER ACCOUNT SET NETWORK_POLICY = corp_egress_only;
 
 CREATE ROLE app_read_role;
-GRANT USAGE ON WAREHOUSE app_wh TO ROLE app_read_role;
-GRANT USAGE ON DATABASE prod TO ROLE app_read_role;
-GRANT USAGE ON SCHEMA prod.app TO ROLE app_read_role;
-GRANT SELECT ON ALL TABLES IN SCHEMA prod.app TO ROLE app_read_role;
-
 CREATE ROW ACCESS POLICY tenant_isolation AS (tenant_id VARCHAR)
   RETURNS BOOLEAN ->
   CURRENT_ROLE() = 'ACCOUNTADMIN'
   OR tenant_id = CURRENT_SESSION()->>'tenant_id';
-
 ALTER TABLE prod.app.events ADD ROW ACCESS POLICY tenant_isolation ON (tenant_id);
+
+CREATE MASKING POLICY mask_email AS (val STRING) RETURNS STRING ->
+  CASE WHEN CURRENT_ROLE() IN ('ANALYST_ROLE') THEN SHA2(val, 256) ELSE val END;
+ALTER TABLE prod.app.customers MODIFY COLUMN email SET MASKING POLICY mask_email;
 
 CREATE SECURE VIEW prod.app.customers_shared AS
   SELECT id, region, hashed_email FROM prod.app.customers;
 
 CREATE SHARE partner_share;
-GRANT USAGE ON DATABASE prod TO SHARE partner_share;
+ALTER SHARE partner_share ADD ACCOUNTS = ('PARTNER.ACCOUNT');
 GRANT SELECT ON VIEW prod.app.customers_shared TO SHARE partner_share;
 ```
 

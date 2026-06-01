@@ -87,6 +87,7 @@ from Crypto.Cipher import AES; AES.new(key, AES.MODE_ECB)
 bytes(a ^ b for a, b in zip(data, key))  # custom XOR
 Fernet(key) with hardcoded key in source
 requests.get(url, verify=False)
+urllib3.util.ssl_.create_urllib3_context()  # custom context without verification
 ```
 
 Also review: `passlib` misconfiguration, `hmac.new` with weak key, `uuid.uuid4()` mistaken for crypto-strength session IDs.

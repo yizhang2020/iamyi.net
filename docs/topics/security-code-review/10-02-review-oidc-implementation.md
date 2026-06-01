@@ -68,17 +68,26 @@ TLS verification is disabled when fetching `.well-known/openid-configuration` or
 ### Python
 
 ```python
-# Dangerous
-claims = jwt.decode(id_token, options={"verify_signature": False})
-userinfo = requests.get(f"{ISSUER}/userinfo", verify=False, headers={...})
+# Dangerous: PyJWT decode without signature verification
+from jose import jwt as jose_jwt
+claims = jose_jwt.get_unverified_claims(id_token)
 
-# Safer: Authlib parse_id_token after authorize_access_token
-from authlib.integrations.flask_client import OAuth
-token = oauth.idp.authorize_access_token()
-userinfo = oauth.idp.parse_id_token(token, nonce=session.pop("oidc_nonce"))
+# Dangerous: UserInfo fetch without TLS
+userinfo = httpx.get(f"{ISSUER}/userinfo", verify=False, headers={...})
+
+# Safer: python-jose with JWKS and explicit claims
+from jose import jwt as jose_jwt
+from jose.backends import RSAKey
+claims = jose_jwt.decode(
+    id_token, key=jwks[header["kid"]], algorithms=["RS256"],
+    audience=CLIENT_ID, issuer=ISSUER,
+    options={"verify_at_hash": True},
+)
+if claims.get("nonce") != session.pop("oidc_nonce"):
+    abort(403)
 ```
 
-Also review: `python-jose` without `issuer`/`audience`, manual JWKS fetch without `kid` rotation handling.
+Also review: `authlib` `parse_id_token`, `python-jose` without `issuer`/`audience`, manual JWKS fetch without `kid` rotation handling.
 
 ### Java
 
@@ -115,10 +124,15 @@ Also review: `Microsoft.IdentityModel.Protocols.OpenIdConnect`, MSAL `ValidateAu
 // Dangerous: client-side id_token parsing
 const payload = JSON.parse(atob(idToken.split('.')[1]));
 
-// Safer: backend-only code flow; openid-client validateIdToken()
-import * as client from 'openid-client';
-const claims = client.validateIdToken(idToken, expectedNonce, clientMetadata, jwks);
+// Safer: openid-client on backend BFF only
+import { Issuer, generators } from 'openid-client';
+const client = await Issuer.discover(ISSUER);
+const params = client.callbackParams(req);
+const tokenSet = await client.callback(REDIRECT_URI, params, { nonce, state });
+const claims = tokenSet.claims();
 ```
+
+Also review: `passport-openidconnect`, NextAuth.js `callbacks.jwt`, SPA implicit flow with fragment `id_token`.
 
 ### Go
 
@@ -132,14 +146,14 @@ verifier := provider.Verifier(&oidc.Config{ClientID: clientID})
 idToken, err := verifier.Verify(ctx, rawIDToken)
 ```
 
-See [Authlib OpenID Connect](https://docs.authlib.org/en/latest/client/flask.html#openid-connect-support), [Nimbus OIDC SDK](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk), [Microsoft.IdentityModel](https://learn.microsoft.com/en-us/entra/identity-platform/id-tokens), and [coreos/go-oidc](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc).
+See [python-jose documentation](https://python-jose.readthedocs.io/), [openid-client](https://github.com/panva/node-openid-client), [Nimbus OIDC SDK](https://connect2id.com/products/nimbus-oauth-openid-connect-sdk), [Microsoft.IdentityModel](https://learn.microsoft.com/en-us/entra/identity-platform/id-tokens), and [coreos/go-oidc](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc).
 
 ## Sample Vulnerable Code in Python
 
 ```python
-import jwt
-import requests
-from flask import Flask, request, session, redirect
+import httpx
+from jose import jwt as jose_jwt
+from flask import Flask, request, session, redirect, abort
 
 app = Flask(__name__)
 CLIENT_ID = "web-app"
@@ -149,12 +163,12 @@ ISSUER = "https://idp.example.com"
 def oidc_callback():
     id_token = request.args.get("id_token") or session.get("id_token")
     # Signature not verified; attacker forges sub and email
-    claims = jwt.decode(id_token, options={"verify_signature": False})
+    claims = jose_jwt.get_unverified_claims(id_token)
     # Issuer and audience checks missing; nonce not compared
     session["user_id"] = claims["sub"]
     session["email"] = claims.get("email")
     # UserInfo used as primary identity without binding to validated id_token
-    userinfo = requests.get(
+    userinfo = httpx.get(
         f"{ISSUER}/userinfo",
         headers={"Authorization": f"Bearer {session.get('access_token')}"},
         verify=False,
@@ -244,39 +258,36 @@ func oidcCallback(w http.ResponseWriter, r *http.Request) {
 
 ### Python
 
-Use Authlib or `python-jose` with issuer JWKS and explicit claim requirements.
+Use `python-jose` with issuer JWKS and explicit claim requirements—not unverified payload reads.
 
 ```python
-from authlib.integrations.flask_client import OAuth
-from authlib.jose import jwt as authlib_jwt
+import httpx
+from jose import jwt as jose_jwt
+from jose.utils import base64url_decode
+from jose.backends import RSAKey
 
-oauth = OAuth(app)
-oauth.register(
-    name="idp",
-    client_id=os.environ["OIDC_CLIENT_ID"],
-    client_secret=os.environ["OIDC_CLIENT_SECRET"],
-    server_metadata_url="https://idp.example.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
-
-@app.route("/login")
-def login():
-    session["oidc_nonce"] = secrets.token_urlsafe(32)
-    return oauth.idp.authorize_redirect(
-        nonce=session["oidc_nonce"],
-        redirect_uri="https://app.example.com/oidc/callback",
-    )
+def load_jwk_for_token(id_token: str, jwks: dict) -> RSAKey:
+    header = jose_jwt.get_unverified_header(id_token)
+    key_data = next(k for k in jwks["keys"] if k["kid"] == header["kid"])
+    return RSAKey(key_data, header.get("alg", "RS256"))
 
 @app.route("/oidc/callback")
 def oidc_callback():
-    token = oauth.idp.authorize_access_token()
-    userinfo = oauth.idp.parse_id_token(token, nonce=session.pop("oidc_nonce"))
-    # userinfo dict is validated: iss, aud, exp, nonce
-    session["sub"] = userinfo["sub"]
+    id_token = session.pop("id_token_from_code_exchange")
+    claims = jose_jwt.decode(
+        id_token,
+        key=load_jwk_for_token(id_token, fetch_jwks(ISSUER)),
+        algorithms=["RS256"],
+        audience=CLIENT_ID,
+        issuer=ISSUER,
+    )
+    if claims.get("nonce") != session.pop("oidc_nonce"):
+        abort(403)
+    session["sub"] = claims["sub"]
     return redirect("/home")
 ```
 
-**Important:** Call `parse_id_token` (or equivalent) on every login. Do not trust query-string `id_token` parameters without full validation.
+**Important:** Never call `get_unverified_claims` on login paths. Exchange the authorization code server-side, then validate the returned `id_token` before creating a session.
 
 ### Java
 
@@ -308,9 +319,12 @@ IDTokenClaimsSet claims = validator.validate(idToken, expectedNonce);
 
 ### C#
 
-Configure OpenID Connect middleware with authority and token validation.
+Configure `Microsoft.Identity.Web` or OpenID Connect middleware with authority and token validation.
 
 ```csharp
+services.AddMicrosoftIdentityWebAppAuthentication(Configuration, "AzureAd");
+
+// Or explicit OpenIdConnect with TokenValidationParameters:
 services.AddAuthentication(options =>
 {
     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -388,7 +402,9 @@ func callback(w http.ResponseWriter, r *http.Request) {
 - [RFC 7519: JSON Web Token](https://www.rfc-editor.org/rfc/rfc7519)
 - [OAuth.net — OpenID Connect](https://oauth.net/2/openid-connect/)
 - [OWASP OAuth 2.0 Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/OAuth2_Cheat_Sheet.html)
-- [Authlib — OpenID Connect](https://docs.authlib.org/en/latest/client/flask.html#openid-connect-support)
+- [python-jose documentation](https://python-jose.readthedocs.io/)
+- [openid-client (Node.js)](https://github.com/panva/node-openid-client)
+- [Microsoft Identity Web](https://learn.microsoft.com/en-us/entra/msal/dotnet/microsoft-identity-web/)
 - [Spring Security — OAuth2 Login](https://docs.spring.io/spring-security/reference/servlet/oauth2/login/index.html)
-- [ASP.NET Core — OpenID Connect](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/openid-connect)
+- [coreos/go-oidc](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc)
 - [coreos/go-oidc](https://pkg.go.dev/github.com/coreos/go-oidc/v3/oidc)

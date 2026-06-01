@@ -178,19 +178,19 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# Legacy upload path — still registered when flag is enabled in production
-if os.getenv("ENABLE_OLD_UPLOAD") == "1":
-    @app.route("/upload/v0", methods=["POST"])
-    def upload_v0():
+# Legacy CSV import — still registered when LEGACY_IMPORT=1 in production
+if os.getenv("LEGACY_IMPORT") == "1":
+    @app.route("/api/legacy/import", methods=["POST"])
+    def legacy_import():
         # Old path without virus scan or size limits
-        save_raw(request.files["file"])
+        ingest_csv(request.files["file"])
         return "", 204
 
-@app.route("/debug/reset-db", methods=["POST"])
-def reset_db():
-    # Test helper never removed — reachable if deployed
-    if request.headers.get("X-Debug") == "1":
-        db.execute("DELETE FROM users")
+@app.route("/internal/reindex", methods=["POST"])
+def reindex_search():
+    # Ops helper never removed — reachable if deployed
+    if request.headers.get("X-Internal-Token") == "reindex-dev":
+        search_index.rebuild_all()
     return "ok"
 ```
 

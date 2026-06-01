@@ -136,22 +136,24 @@ GET /login?password=secret HTTP/1.1
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, request
+import structlog
+from fastapi import FastAPI, Request
 
-app = Flask(__name__)
+app = FastAPI()
+log = structlog.get_logger()
 
-@app.post("/pay")
-def pay():
-    card = request.json
-    # Sink: full payment payload including PAN and CVV written to logs
-    app.logger.debug("charge payload=%s", card)
-    return charge(card)
+@app.post("/oauth/token")
+async def token_exchange(request: Request):
+    body = await request.json()
+    # Sink: refresh token and client secret written to structured logs
+    log.debug("token_exchange", grant=body)
+    return await issue_tokens(body)
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search log calls with request data.** Look for interpolation of parameters, headers, cookies, or full JSON bodies.
-2. **Trace the Python payment handler.** In the sample, `card` may contain PAN and CVV. Debug level does not make the data safe in production.
+2. **Trace the OAuth token exchange handler.** In the sample, the full grant body may contain refresh tokens and client secrets. Debug level does not make the data safe in production.
 3. **Review exception handlers.** Messages that echo SQL or user input can land in log files and APM.
 4. **Inspect access log configuration.** Query strings and `Authorization` headers must not appear on auth endpoints.
 5. **Check reset and MFA flows.** Tokens or OTP codes left in stdout or logs from development leftovers are common findings.

@@ -37,47 +37,47 @@ Use these in authorized tests when request parameters are echoed in the immediat
 ### Pattern 1: Query parameter script injection
 
 ```text
-/search?q=<script>alert(document.domain)</script>
-/login?error=<img src=x onerror=alert(1)>
-/greet?name=<svg/onload=alert(1)>
+/login?error=<script>alert(document.domain)</script>
+/reset?msg=<img src=x onerror=alert(1)>
+/oauth/callback?state=<svg/onload=alert(1)>
 ```
 
 ### Pattern 2: Attribute context breakout
 
 ```text
-?q="><script>alert(1)</script>
-?redirect_url=javascript:alert(1)
-?class=' onmouseover='alert(1)
+?next="><script>alert(1)</script>
+?return_url=javascript:alert(1)
+?style=' onmouseover='alert(1)
 ```
 
 ### Pattern 3: Path or fragment reflection
 
 ```text
-/page/<script>alert(1)</script>
-/404?path=</title><script>alert(1)</script>
+/404?uri=</title><script>alert(1)</script>
+/help/<script>alert(1)</script>
 ```
 
 ### Pattern 4: Header or cookie echo
 
 ```text
 Referer: https://evil.example/<script>alert(1)</script>
-Cookie: display_name=<img src=x onerror=alert(1)>
+Cookie: locale=<img src=x onerror=alert(1)>
 ```
 
 ### Pattern 5: Filter bypass variants
 
 ```text
-?q=<ScRiPt>alert(1)</ScRiPt>
-?q=<img src=x onerror=&#97;lert(1)>
-?q=<svg><script>alert&#40;1&#41;
+?error=<ScRiPt>alert(1)</ScRiPt>
+?msg=<img src=x onerror=&#97;lert(1)>
+?hint=<svg><script>alert&#40;1&#41;
 ```
 
 ### Pattern 6: DOM-based follow-on (when reflection lands in JS)
 
 ```text
-?q=';alert(1)//
-?q=</script><script>alert(1)</script>
-?callback=alert(1)//  (JSONP-style sinks)
+?token=';alert(1)//
+?nonce=</script><script>alert(1)</script>
+?jsonp=alert(1)//  (JSONP-style sinks)
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -87,47 +87,47 @@ Reflected XSS sinks appear wherever request data is written into HTML in the sam
 ### Python (Flask / Jinja2)
 
 ```python
-return f"<p>Results for: {request.args['q']}</p>"
-return render_template_string(f"<h1>{term}</h1>")
+return f"<p class='error'>{request.args['error']}</p>"
+return render_template_string(f"<div>{reset_msg}</div>")
 return Markup(request.args.get("msg", ""))
 ```
 
 ### Java (JSP / servlets)
 
 ```jsp
-Search: <%= request.getParameter("q") %>
-<c:out value="${param.error}" escapeXml="false"/>
-out.println("Hello " + request.getParameter("name"));
+Login failed: <%= request.getParameter("error") %>
+<c:out value="${param.reason}" escapeXml="false"/>
+out.println("Reset link sent to " + request.getParameter("email"));
 ```
 
 ### C# (ASP.NET / Razor)
 
 ```csharp
-return Content($"<p>Error: {Request.Query["msg"]}</p>", "text/html");
-@Html.Raw(Request.Query["q"])
-Response.Write(Request["term"]);
+return Content($"<p>OAuth error: {Request.Query["error_description"]}</p>", "text/html");
+@Html.Raw(Request.Query["msg"])
+Response.Write(Request["failure_reason"]);
 ```
 
 ### JavaScript (Node / Express)
 
 ```javascript
-res.send(`<h1>You searched for: ${req.query.q}</h1>`);
-document.body.innerHTML = location.search;
-res.render("search", { term: req.query.q, autoEscape: false });
+res.send(`<p>Invalid token: ${req.query.token}</p>`);
+document.title = location.hash.slice(1);
+res.render("error", { detail: req.query.detail, autoEscape: false });
 ```
 
 ### HTML (error pages and static responses)
 
 ```html
-<p>Invalid input: <!-- reflected param inserted without encoding --></p>
-<meta http-equiv="refresh" content="0;url=REFLECTED_URL">
+<p>Password reset failed: <!-- reflected error param inserted without encoding --></p>
+<meta http-equiv="refresh" content="0;url=REFLECTED_RETURN_URL">
 ```
 
 ### Go
 
 ```go
-fmt.Fprintf(w, "<p>Query: %s</p>", r.URL.Query().Get("q"))
-template.HTML(reflectedTerm)  // disables escaping
+fmt.Fprintf(w, "<p>Login error: %s</p>", r.URL.Query().Get("error"))
+template.HTML(reflectedMessage)  // disables escaping
 ```
 
 ## Sample Vulnerable Code in Python
@@ -137,19 +137,19 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route("/search")
-def search():
-    # Attacker-controlled query parameter from the current request
-    term = request.args.get("q", "")
+@app.route("/login")
+def login_error():
+    # Attacker-controlled error message from failed login redirect
+    error = request.args.get("error", "")
     # Sink: reflected value embedded in HTML — no encoding
-    return f"<h1>Search</h1><p>You searched for: {term}</p>"
+    return f"<h1>Sign in</h1><p class='alert'>{error}</p>"
 ```
 
 ## Step-by-Step Review Walkthrough
 
-1. **Find echo endpoints.** Search for handlers that read request parameters and return HTML in the same action. Search forms, error pages, and login failures are high yield.
-2. **Trace the Python (or equivalent) read path.** In the sample, `request.args.get("q")` is attacker-controlled on every GET. Ask whether any validation runs before the response is built; input filtering is not a substitute for output encoding.
-3. **Locate the HTML sink.** The f-string builds markup directly. Any `<script>` in `q` runs in the victim browser when they open a crafted link.
+1. **Find echo endpoints.** Search for handlers that read request parameters and return HTML in the same action. Login failures, password-reset messages, and OAuth error pages are high yield.
+2. **Trace the Python (or equivalent) read path.** In the sample, `request.args.get("error")` is attacker-controlled on every GET. Ask whether any validation runs before the response is built; input filtering is not a substitute for output encoding.
+3. **Locate the HTML sink.** The f-string builds markup directly. Any `<script>` in `error` runs in the victim browser when they open a crafted link.
 4. **Check error and validation branches.** Failed logins and 404 handlers often echo user input in messages. Review every branch, not only the happy path.
 5. **Inspect non-HTML contexts.** Reflected values in `<script>` blocks, event handlers, `javascript:` URLs, and JSONP callbacks need context-specific encoding, not only HTML body encoding.
 6. **Review URL decoding.** Double-encoded payloads may bypass naive denylist filters applied before reflection.
@@ -173,50 +173,50 @@ def search():
 @Override
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, IOException {
-    String query = request.getParameter("q");
-    request.setAttribute("searchTerm", query);
-    request.getRequestDispatcher("/search.jsp").forward(request, response);
+    String reason = request.getParameter("reason");
+    request.setAttribute("failureReason", reason);
+    request.getRequestDispatcher("/login.jsp").forward(request, response);
 }
-// search.jsp: <p>Results for <%= request.getAttribute("searchTerm") %></p>
+// login.jsp: <p class="error"><%= request.getAttribute("failureReason") %></p>
 ```
 
 ### C#
 
 ```csharp
-public IActionResult Search(string q)
+public IActionResult ResetPassword(string token, string msg)
 {
-    ViewBag.Message = $"You searched for: {q}";
+    ViewBag.StatusMessage = $"Reset failed: {msg}";
     return View();
 }
-// Search.cshtml: @Html.Raw(ViewBag.Message)
+// ResetPassword.cshtml: @Html.Raw(ViewBag.StatusMessage)
 ```
 
 ### JavaScript
 
 ```javascript
-// Reflected query parameter written into the DOM
-const q = new URLSearchParams(location.search).get("q") || "";
-document.getElementById("results").innerHTML = `Results for: ${q}`;
+// Reflected OAuth error parameter written into the DOM
+const err = new URLSearchParams(location.search).get("error_description") || "";
+document.getElementById("oauth-error").innerHTML = `Authorization failed: ${err}`;
 ```
 
 ### HTML
 
 ```html
-<!-- JSP echoes request parameter without encoding -->
-<p>Results for <%= request.getParameter("q") %></p>
+<!-- JSP echoes password-reset message without encoding -->
+<p><%= request.getParameter("msg") %></p>
 
-<!-- Error page reflects user-supplied message -->
-<div class="alert"><%= request.getAttribute("errorMsg") %></div>
+<!-- 404 handler reflects requested URI -->
+<div class="not-found">Page not found: <%= request.getAttribute("uri") %></div>
 ```
 
 ### Go
 
 ```go
-func search(w http.ResponseWriter, r *http.Request) {
-    q := r.URL.Query().Get("q")
-    tmpl := `<html><body><p>Results for: {{.Query}}</p></body></html>`
-    t := template.Must(template.New("s").Parse(tmpl))
-    t.Execute(w, map[string]string{"Query": q}) // text/template, not html/template
+func loginError(w http.ResponseWriter, r *http.Request) {
+    errMsg := r.URL.Query().Get("error")
+    tmpl := `<html><body><h1>Login</h1><p class="alert">{{.Error}}</p></body></html>`
+    t := template.Must(template.New("login").Parse(tmpl))
+    t.Execute(w, map[string]string{"Error": errMsg}) // text/template, not html/template
 }
 ```
 
@@ -232,13 +232,13 @@ from markupsafe import escape
 
 app = Flask(__name__)
 
-@app.route("/search")
-def search():
-    term = request.args.get("q", "")
-    return render_template("search.html", term=term)
+@app.route("/login")
+def login_error():
+    error = request.args.get("error", "")
+    return render_template("login.html", error=error)
 
 # Manual encoding when building non-template fragments:
-safe_line = escape(term)
+safe_error = escape(error)
 ```
 
 **Important:** `render_template_string` with user-influenced template text is both reflected XSS and SSTI risk. Use static template files and pass data as variables.
@@ -246,8 +246,8 @@ safe_line = escape(term)
 ```python
 # Validate format when the parameter has a fixed shape (defense in depth):
 import re
-if not re.fullmatch(r"[a-zA-Z0-9\s-]{1,64}", term):
-    term = ""
+if not re.fullmatch(r"[a-zA-Z0-9\s.,!?-]{1,128}", error):
+    error = ""
 ```
 
 ### Java
@@ -256,14 +256,14 @@ Encode at the HTML sink. Prefer JSTL or OWASP Encoder over regex-only input filt
 
 ```jsp
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<p>Results for <c:out value="${searchTerm}" /></p>
+<p>Login failed: <c:out value="${failureReason}" /></p>
 ```
 
 ```java
 import org.owasp.encoder.Encode;
 
-String safe = Encode.forHtml(request.getParameter("q"));
-model.addAttribute("safeTerm", safe);
+String safe = Encode.forHtml(request.getParameter("error"));
+model.addAttribute("safeError", safe);
 ```
 
 **Important:** Thymeleaf `th:utext` and unescaped JSP scriptlets bypass default protections. Use `th:text` for reflected request data.
@@ -274,14 +274,14 @@ Razor encodes by default. Avoid `Html.Raw` on request-derived strings.
 
 ```cshtml
 @* Safe default encoding *@
-<p>You searched for: @Model.SearchTerm</p>
+<p class="alert">@Model.ErrorMessage</p>
 ```
 
 ```csharp
 using System.Net;
 
-var encoded = WebUtility.HtmlEncode(q);
-ViewBag.SafeMessage = $"You searched for: {encoded}";
+var encoded = WebUtility.HtmlEncode(msg);
+ViewBag.SafeMessage = $"Reset failed: {encoded}";
 ```
 
 For controlled HTML subsets in reflected content, use a maintained sanitizer with an explicit policy.
@@ -293,12 +293,12 @@ Use `html/template`, not `text/template`, for HTML responses.
 ```go
 import "html/template"
 
-var searchTmpl = template.Must(template.New("search").Parse(
-    `<h1>Search</h1><p>You searched for: {{.Term}}</p>`))
+var loginTmpl = template.Must(template.New("login").Parse(
+    `<h1>Sign in</h1><p class="alert">{{.Error}}</p>`))
 
-func search(w http.ResponseWriter, r *http.Request) {
-    term := r.URL.Query().Get("q")
-    searchTmpl.Execute(w, struct{ Term string }{Term: term})
+func loginError(w http.ResponseWriter, r *http.Request) {
+    errMsg := r.URL.Query().Get("error")
+    loginTmpl.Execute(w, struct{ Error string }{Error: errMsg})
 }
 ```
 

@@ -153,28 +153,36 @@ proxy_intercept_errors off;  # upstream stack body passed through
 
 ```python
 import traceback
-from flask import Flask
+import logging
+import uuid
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-app = Flask(__name__)
+app = FastAPI()
+logger = logging.getLogger("reports")
 
-@app.route("/report")
-def report():
+@app.get("/reports/run")
+async def run_report(request: Request):
     try:
-        return generate_report()
+        return await generate_report()
     except Exception as exc:
-        # Stack trace returned to client — reveals paths, libraries, and query details
-        return {"error": str(exc), "trace": traceback.format_exc()}, 500
+        # Stack trace returned to client — reveals paths, ORM queries, and library versions
+        return JSONResponse(
+            {"error": str(exc), "trace": traceback.format_exc()},
+            status_code=500,
+        )
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Locate every catch block and exception handler** that writes to HTTP responses or API error payloads.
-2. **Check framework and server configuration.** `web.xml` error pages, Spring `server.error.*`, Django `DEBUG`, Flask `PROPAGATE_EXCEPTIONS`, and Express error middleware.
-3. **Trace whether stack traces reach clients** in any environment via `printStackTrace`, `e.message`, or full exception serialization.
-4. **Review API layers** that serialize exceptions into JSON (`detail`, `stack`, embedded file paths).
-5. **Confirm a catch-all error page exists** so undefined HTTP error codes do not fall back to container defaults.
-6. **Inspect health and diagnostic endpoints** that echo environment variables or build metadata on failure.
-7. **Verify logging sends stack traces to secure server logs**, not to the user agent.
+2. **Trace the FastAPI report route.** In the sample, `traceback.format_exc()` in JSON responses exposes internal paths and ORM details.
+3. **Check framework and server configuration.** `web.xml` error pages, Spring `server.error.*`, Django `DEBUG`, FastAPI exception handlers, and Express error middleware.
+4. **Trace whether stack traces reach clients** in any environment via `printStackTrace`, `e.message`, or full exception serialization.
+5. **Review API layers** that serialize exceptions into JSON (`detail`, `stack`, embedded file paths).
+6. **Confirm a catch-all error page exists** so undefined HTTP error codes do not fall back to container defaults.
+7. **Inspect health and diagnostic endpoints** that echo environment variables or build metadata on failure.
+8. **Verify logging sends stack traces to secure server logs**, not to the user agent.
 
 ## Risk Impact Analysis
 
@@ -228,26 +236,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
 Register error handlers that return generic messages. Log full exceptions server-side with a correlation ID.
 
 ```python
+import traceback
 import logging
 import uuid
-from flask import Flask, jsonify
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
-app = Flask(__name__)
-app.config["DEBUG"] = False
-logger = logging.getLogger(__name__)
+app = FastAPI()
+logger = logging.getLogger("reports")
 
-@app.errorhandler(Exception)
-def handle_error(exc):
+@app.exception_handler(Exception)
+async def handle_error(request, exc):
     request_id = str(uuid.uuid4())
     logger.exception("unhandled error request_id=%s", request_id)
-    return jsonify({
-        "error": "An internal error occurred.",
-        "request_id": request_id,
-    }), 500
+    return JSONResponse(
+        {"error": "An internal error occurred.", "request_id": request_id},
+        status_code=500,
+    )
 
-@app.route("/report")
-def report():
-    return generate_report()
+@app.get("/reports/run")
+async def run_report():
+    return await generate_report()
 ```
 
 **Important:** Keep Django `DEBUG=False` in production. Use `handler500` and logging settings for details. Never return `traceback.format_exc()` to users.

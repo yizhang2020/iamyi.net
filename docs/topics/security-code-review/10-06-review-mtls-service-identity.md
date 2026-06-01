@@ -232,38 +232,18 @@ srv := &http.Server{Addr: ":8443", TLSConfig: tlsConfig}
 
 ## Fix: Safer Patterns and Libraries to Use
 
-### Python
-
-Require and validate client certificates on internal listeners. Map verified identity to authorization decisions.
+### Python (mTLS with SPIRE workload API)
 
 ```python
+from spiffe.workloadapi import WorkloadApiClient
 import ssl
-import socket
 
-def build_mtls_server_context(ca_file: str, cert_file: str, key_file: str) -> ssl.SSLContext:
-    ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-    ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.load_verify_locations(cafile=ca_file)
-    ctx.load_cert_chain(certfile=cert_file, keyfile=key_file)
-    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    return ctx
-
-def peer_spiffe_id(peercert: dict) -> str | None:
-    for typ, val in peercert.get("subjectAltName", ()):
-        if typ == "URI" and val.startswith("spiffe://"):
-            return val
-    return None
-
-ctx = build_mtls_server_context("mesh-ca.pem", "server.pem", "server-key.pem")
-with socket.create_server(("0.0.0.0", 8443)) as sock:
-    with ctx.wrap_socket(sock, server_side=True) as tls_sock:
-        conn, _ = tls_sock.accept()
-        with conn:
-            spiffe_id = peer_spiffe_id(conn.getpeercert())
-            if spiffe_id not in ALLOWED_CALLERS:
-                conn.close()
-                return
-            handle_request(conn, spiffe_id)
+client = WorkloadApiClient()
+svid = client.fetch_x509_svid()
+ctx = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+ctx.load_cert_chain(certfile=svid.cert_path, keyfile=svid.key_path)
+ctx.load_verify_locations(cafile=client.fetch_x509_bundles().path)
+ctx.verify_mode = ssl.CERT_REQUIRED
 ```
 
 **Important:** `CERT_OPTIONAL` and `VerifyClientCertIfGiven` are not mTLS for high-value endpoints. Pair mTLS with server cert verification on clients.

@@ -37,46 +37,47 @@ Use these in authorized tests against login, search, and filter parameters. Synt
 ### Pattern 1: Authentication bypass (string context)
 
 ```sql
-' OR '1'='1
-' OR '1'='1'--
 admin'--
-' OR 1=1--
+' OR '1'='1'--
+' OR 1=1 LIMIT 1--
+guest' OR 'x'='x
 ```
 
 ### Pattern 2: Comment termination
 
 ```sql
-'; DROP TABLE users;--
-value' /* comment */ OR '1'='1
-# MySQL comment
+'; DELETE FROM audit_log WHERE '1'='1
+report' /* */ OR 1=1--
+# MySQL comment on filter value
 ```
 
 ### Pattern 3: UNION-based extraction
 
 ```sql
-' UNION SELECT username, password_hash FROM users--
-' UNION SELECT NULL, table_name FROM information_schema.tables--
+' UNION SELECT email, api_key FROM integrations--
+' UNION SELECT NULL, column_name FROM information_schema.columns--
 ```
 
 ### Pattern 4: Boolean-based blind
 
 ```sql
-' AND 1=1--
+' AND (SELECT COUNT(*) FROM users)>0--
+' AND (SELECT SUBSTRING(api_key,1,1) FROM secrets LIMIT 1)='a'--
 ' AND 1=2--
-' AND SUBSTRING(password,1,1)='a'--
 ```
 
 ### Pattern 5: Time-based blind
 
 ```sql
+'; WAITFOR DELAY '0:0:5';--
+' OR IF(1=1,BENCHMARK(5000000,SHA1('x')),0)--
 '; SELECT pg_sleep(5);--
-' OR IF(1=1,SLEEP(5),0)--
 ```
 
 ### Pattern 6: Stacked queries (when supported)
 
 ```sql
-'; INSERT INTO admins VALUES ('backdoor','hash');--
+'; UPDATE orders SET total=0 WHERE id=1;--
 ```
 
 ## Language-Specific Sinks and Dangerous APIs
@@ -84,31 +85,31 @@ value' /* comment */ OR '1'='1
 ### Python
 
 ```python
-cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
-cursor.execute("SELECT * FROM t WHERE name = '%s'" % name)
-db.engine.execute("SELECT ... " + filter_val)
-Model.objects.raw(f"SELECT ... {sort}")
-session.execute(text(f"SELECT ... {col}"))  # SQLAlchemy — bind params instead
+cursor.execute(f"SELECT * FROM orders WHERE status = '{status}' ORDER BY {sort_col}")
+cursor.execute("SELECT * FROM reports WHERE region = '%s'" % region)
+db.engine.execute("SELECT ... WHERE created_at > " + start_date)
+Model.objects.raw(f"SELECT ... {filter_clause}")
+session.execute(text(f"SELECT ... ORDER BY {user_sort}"))
 ```
 
-ORM escape hatches: `.extra(where=...)`, `RawSQL`, `connection.cursor().execute(string)`.
+ORM escape hatches: `.extra(order_by=...)`, `RawSQL`, `connection.cursor().execute(string)`.
 
 ### Java
 
 ```java
-stmt.executeQuery("SELECT * FROM users WHERE name = '" + name + "'");
-PreparedStatement ps = conn.prepareStatement("SELECT * FROM t ORDER BY " + sortColumn);
-entityManager.createNativeQuery("... " + userFilter);
+stmt.executeQuery("SELECT * FROM invoices WHERE customer = '" + customer + "'");
+PreparedStatement ps = conn.prepareStatement("SELECT * FROM sales ORDER BY " + sortColumn);
+entityManager.createNativeQuery("... WHERE " + userFilter);
 ```
 
-MyBatis: `${name}` in XML mappers (unsafe interpolation) vs `#{name}` (bound).
+MyBatis: `${column}` in XML mappers (unsafe interpolation) vs `#{column}` (bound).
 
 ### C#
 
 ```csharp
-cmd.CommandText = $"SELECT * FROM Users WHERE Name = '{name}'";
-context.Database.ExecuteSqlRaw($"DELETE FROM Logs WHERE id = {id}");
-FromSqlRaw($"SELECT * FROM Products WHERE {userFilter}");
+cmd.CommandText = $"SELECT * FROM Reports WHERE Region = '{region}' ORDER BY {sort}";
+context.Database.ExecuteSqlRaw($"DELETE FROM exports WHERE id = {exportId}");
+FromSqlRaw($"SELECT * FROM metrics WHERE {userClause}");
 ```
 
 Dapper: only safe when SQL uses `@param` with object properties—not string-built SQL.
@@ -116,29 +117,29 @@ Dapper: only safe when SQL uses `@param` with object properties—not string-bui
 ### JavaScript
 
 ```javascript
-db.query(`SELECT * FROM users WHERE id = ${req.params.id}`);
-connection.query("SELECT * FROM t WHERE name = '" + name + "'");
-knex.raw(`SELECT * FROM users WHERE ${userClause}`);
+db.query(`SELECT * FROM events WHERE type = '${req.query.type}' ORDER BY ${req.query.sort}`);
+connection.query("SELECT * FROM logs WHERE level = '" + level + "'");
+knex.raw(`SELECT * FROM shipments WHERE ${userWhere}`);
 ```
 
 ### Go
 
 ```go
-db.Query(fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", name))
-db.Exec("DELETE FROM items WHERE id = " + id)
+db.Query(fmt.Sprintf("SELECT * FROM orders WHERE region = '%s'", region))
+db.Exec("SELECT * FROM reports ORDER BY " + sortCol)
 ```
 
 ### SQL (dynamic fragments in migrations, reports, BI tools)
 
 ```sql
-EXEC('SELECT * FROM users WHERE role = ''' + @role + '''');
+EXEC('SELECT * FROM sales WHERE quarter = ''' + @quarter + ''' ORDER BY ' + @sortCol);
 ORDER BY @userSortColumn;  -- identifier injection if not allowlisted
 ```
 
 ### C
 
 ```c
-sprintf(query, "SELECT * FROM users WHERE id = %s", user_id);
+sprintf(query, "SELECT * FROM audit WHERE id = %s ORDER BY %s", audit_id, sort_col);
 sqlite3_exec(db, query, ...);
 ```
 
@@ -149,20 +150,24 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route("/users")
-def find_user():
-    # Attacker-controlled username from query string
-    name = request.args.get("name", "")
+@app.route("/reports/export")
+def export_report():
+    # Attacker-controlled region filter and sort column from query string
+    region = request.args.get("region", "")
+    sort_col = request.args.get("sort", "created_at")
     cursor = db.cursor()
     # Sink: user input concatenated into SQL — changes query structure
-    cursor.execute(f"SELECT * FROM users WHERE username = '{name}'")
+    cursor.execute(
+        f"SELECT id, total, region FROM orders "
+        f"WHERE region = '{region}' ORDER BY {sort_col}"
+    )
     return jsonify(cursor.fetchall())
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Find every database call.** Search for ORM raw queries, DB-API cursors, and stored procedure invocations built from strings.
-2. **Trace the Python (or equivalent) input path.** In the sample, `request.args.get("name")` flows into an f-string. Ask whether any placeholder binding exists; there is none.
+2. **Trace the Python (or equivalent) input path.** In the sample, `region` and `sort_col` flow into an f-string. Ask whether any placeholder binding exists; there is none.
 3. **Inspect concatenation patterns.** Flag `+`, `%`, f-string, and `format()` that include request data in SQL text.
 4. **Review dynamic identifiers.** Column names, table names, and `ORDER BY` clauses from user input need allowlists, not quoting alone.
 5. **Follow ORM escape hatches.** Audit `.raw()`, `.extra()`, `text()` with string interpolation, and similar APIs.
@@ -184,55 +189,61 @@ def find_user():
 ### Java
 
 ```java
-public User authenticate(String username, String password) throws SQLException {
-    String sql = "SELECT * FROM users WHERE username = '" + username
-               + "' AND password = '" + password + "'";
+public List<Order> exportByRegion(String region, String sortColumn) throws SQLException {
+    String sql = "SELECT id, total, region FROM orders WHERE region = '"
+               + region + "' ORDER BY " + sortColumn;
     Statement stmt = connection.createStatement();
     ResultSet rs = stmt.executeQuery(sql);
-    return rs.next() ? mapUser(rs) : null;
+    return mapOrders(rs);
 }
 ```
 
 ### C#
 
 ```csharp
-public User GetUser(string username)
+public IEnumerable<ReportRow> GetReport(string region, string sort)
 {
-    var sql = $"SELECT * FROM Users WHERE Username = '{username}'";
+    var sql = $"SELECT id, amount FROM sales WHERE region = '{region}' ORDER BY {sort}";
     using var cmd = new SqlCommand(sql, _connection);
     using var reader = cmd.ExecuteReader();
-    return reader.Read() ? MapUser(reader) : null;
+    return MapRows(reader);
 }
 ```
 
 ### SQL
 
 ```sql
--- Dynamic SQL built inside the database (concatenated parameter)
-CREATE PROCEDURE dbo.GetUser @name NVARCHAR(128)
+-- Dynamic report SQL built inside the database (concatenated parameters)
+CREATE PROCEDURE dbo.ExportSales @region NVARCHAR(64), @sort NVARCHAR(64)
 AS
 BEGIN
     DECLARE @sql NVARCHAR(MAX) =
-        N'SELECT * FROM Users WHERE Username = ''' + @name + N'''';
+        N'SELECT id, amount FROM sales WHERE region = ''' + @region
+        + N''' ORDER BY ' + @sort;
     EXEC(@sql);
 END;
 ```
 
 ```sql
--- Second-order: stored value breaks a later batch query
-SELECT * FROM audit_log
-WHERE message LIKE '%' + (SELECT bio FROM users WHERE id = @id) + '%';
+-- Second-order: stored filter value breaks a later batch query
+SELECT * FROM exports
+WHERE criteria LIKE '%' + (SELECT saved_filter FROM user_prefs WHERE id = @uid) + '%';
 ```
 
 ### Go
 
 ```go
-func getUser(db *sql.DB, username string) (*User, error) {
-    query := fmt.Sprintf("SELECT id, username FROM users WHERE username = '%s'", username)
-    row := db.QueryRow(query)
-    var u User
-    err := row.Scan(&u.ID, &u.Username)
-    return &u, err
+func exportOrders(db *sql.DB, region, sortCol string) ([]Order, error) {
+    query := fmt.Sprintf(
+        "SELECT id, total FROM orders WHERE region = '%s' ORDER BY %s",
+        region, sortCol,
+    )
+    rows, err := db.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    return scanOrders(rows)
 }
 ```
 
@@ -243,11 +254,15 @@ func getUser(db *sql.DB, username string) (*User, error) {
 Use DB-API parameterized queries or ORM filters. Never interpolate user strings into SQL text.
 
 ```python
-@app.route("/users")
-def find_user():
-    name = request.args.get("name", "")
+@app.route("/reports/export")
+def export_report():
+    region = request.args.get("region", "")
+    sort = request.args.get("sort", "created_at")
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (name,))
+    cursor.execute(
+        "SELECT id, total, region FROM orders WHERE region = ? ORDER BY created_at",
+        (region,),
+    )
     return jsonify(cursor.fetchall())
 ```
 
@@ -256,19 +271,19 @@ def find_user():
 from sqlalchemy import text
 
 session.execute(
-    text("SELECT * FROM users WHERE username = :name"),
-    {"name": name},
+    text("SELECT id, total FROM orders WHERE region = :region ORDER BY created_at"),
+    {"region": region},
 )
 ```
 
 **Important:** Dynamic column or table names cannot use `?` placeholders. Map user choices to a fixed allowlist before query assembly.
 
 ```python
-ALLOWED_SORT = {"name", "created_at"}
-sort = request.args.get("sort", "name")
+ALLOWED_SORT = {"created_at", "total", "region"}
+sort = request.args.get("sort", "created_at")
 if sort not in ALLOWED_SORT:
-    sort = "name"
-cursor.execute(f"SELECT * FROM users ORDER BY {sort}")  # sort is allowlisted only
+    sort = "created_at"
+cursor.execute(f"SELECT id, total, region FROM orders ORDER BY {sort}")  # sort is allowlisted only
 ```
 
 ### Java
@@ -276,19 +291,18 @@ cursor.execute(f"SELECT * FROM users ORDER BY {sort}")  # sort is allowlisted on
 Bind user values with `PreparedStatement` setters.
 
 ```java
-String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
+String sql = "SELECT id, total FROM orders WHERE region = ? ORDER BY created_at";
 PreparedStatement ps = connection.prepareStatement(sql);
-ps.setString(1, username);
-ps.setString(2, passwordHash);
+ps.setString(1, region);
 ResultSet rs = ps.executeQuery();
 ```
 
 ```java
 // Spring JdbcTemplate
 jdbcTemplate.query(
-    "SELECT * FROM users WHERE id = ?",
-    rs -> mapUser(rs),
-    userId
+    "SELECT id, amount FROM sales WHERE region = ?",
+    rs -> mapRow(rs),
+    region
 );
 ```
 
@@ -299,15 +313,15 @@ jdbcTemplate.query(
 Use ADO.NET parameters with `@param` placeholders.
 
 ```csharp
-var sql = "SELECT * FROM Users WHERE Username = @username";
+var sql = "SELECT id, amount FROM sales WHERE region = @region";
 using var cmd = new SqlCommand(sql, _connection);
-cmd.Parameters.AddWithValue("@username", username);
+cmd.Parameters.AddWithValue("@region", region);
 using var reader = cmd.ExecuteReader();
 ```
 
 ```csharp
 // Entity Framework Core — prefer LINQ:
-var user = _db.Users.FirstOrDefault(u => u.Username == username);
+var rows = _db.Sales.Where(s => s.Region == region).OrderBy(s => s.CreatedAt);
 ```
 
 **Important:** `FromSqlRaw` with string interpolation is unsafe. Use `FromSqlRaw` with explicit `SqlParameter` objects or LINQ.
@@ -317,13 +331,13 @@ var user = _db.Users.FirstOrDefault(u => u.Username == username);
 Use `database/sql` placeholders. Never build query strings with user input.
 
 ```go
-row := db.QueryRow("SELECT id, username FROM users WHERE username = ?", username)
+row := db.QueryRow("SELECT id, total FROM orders WHERE region = ?", region)
 ```
 
 ```go
 // sqlx named query
-query := `SELECT id, username FROM users WHERE username = :username`
-rows, err := db.NamedQuery(query, map[string]interface{}{"username": username})
+query := `SELECT id, amount FROM sales WHERE region = :region`
+rows, err := db.NamedQuery(query, map[string]interface{}{"region": region})
 ```
 
 **Important:** GORM `Raw(fmt.Sprintf(...))` with user input is equivalent to concatenation. Use chain methods or bound arguments.

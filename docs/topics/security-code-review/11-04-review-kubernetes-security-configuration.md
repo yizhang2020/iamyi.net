@@ -51,18 +51,27 @@ roleRef:
 
 Any pod using `default` SA in production can read all secrets cluster-wide and deploy workloads.
 
-### Example 2: Secret via environment variable
+### Example 2: Secret via projected volume misconfiguration
 
 ```yaml
-env:
-  - name: DATABASE_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: db-credentials
-        key: password
+volumes:
+  - name: db-credentials
+    projected:
+      sources:
+        - secret:
+            name: db-credentials
+            items:
+              - key: password
+                path: password
+                mode: 0444  # world-readable inside container
+containers:
+  - name: api
+    volumeMounts:
+      - name: db-credentials
+        mountPath: /etc/secrets
+        readOnly: true
+    # Application still logs mount path contents on startup — review app code
 ```
-
-Password visible in `kubectl describe pod`, `/proc`, crash dumps, and some APM agents.
 
 ### Example 3: Privileged pod without NetworkPolicy
 

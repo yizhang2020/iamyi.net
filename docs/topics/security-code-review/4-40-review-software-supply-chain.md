@@ -77,10 +77,10 @@ Review `postinstall`, `preinstall`, and `prepare` in `package.json` and equivale
 ### Pattern 5: Known vulnerable version left in place
 
 ```text
-log4j-core:2.14.0
-pyyaml:5.1
-urllib3:1.24.1
-spring-core:5.3.0  # check against OSV/GitHub Advisory
+log4j-core:2.14.1
+node-forge:0.10.0
+urllib3:1.26.5  # check against OSV/GitHub Advisory
+spring-beans:5.3.18
 ```
 
 ## Language-Specific Sinks and Dangerous APIs

@@ -144,18 +144,20 @@ See [Go crypto/tls](https://pkg.go.dev/crypto/tls).
 ## Sample Vulnerable Code in Python
 
 ```python
+import aiohttp
 import ssl
-import urllib.request
 
-def fetch_partner_data(host: str) -> bytes:
+async def fetch_partner_data(host: str) -> bytes:
     # Weak protocol range and trust-all context — no meaningful peer authentication
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    ctx.set_ciphers("DEFAULT:@SECLEVEL=0")  # may permit weak ciphers for "compat"
+    ctx.minimum_version = ssl.TLSVersion.TLSv1  # obsolete minimum
     url = f"https://{host}/v1/export"
-    with urllib.request.urlopen(url, context=ctx, timeout=10) as resp:
-        return resp.read()
+    connector = aiohttp.TCPConnector(ssl=ctx)
+    async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=10)) as session:
+        async with session.get(url) as resp:
+            return await resp.read()
 ```
 
 ## Step-by-Step Review Walkthrough
@@ -242,22 +244,18 @@ resp, _ := client.Get("https://api.example.com/v1/data")
 Use default verification in HTTP libraries. Restrict protocols and ciphers only through explicit, documented baselines.
 
 ```python
+import aiohttp
 import ssl
-import httpx
 
-# Prefer library defaults: verify=True, system trust store, hostname check enabled
-def fetch_export(base_url: str, ca_bundle: str | None = None) -> bytes:
-    verify: str | bool = ca_bundle if ca_bundle else True
-    with httpx.Client(verify=verify, timeout=10.0) as client:
-        resp = client.get(f"{base_url.rstrip('/')}/v1/export")
-        resp.raise_for_status()
-        return resp.content
-
-# When constructing SSLContext directly (non-HTTP sockets)
-ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
-ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-ctx.check_hostname = True
-ctx.verify_mode = ssl.CERT_REQUIRED
+async def fetch_export(base_url: str, ca_file: str | None = None) -> bytes:
+    ssl_ctx = ssl.create_default_context(cafile=ca_file) if ca_file else True
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ssl=ssl_ctx),
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as session:
+        async with session.get(f"{base_url.rstrip('/')}/v1/export") as resp:
+            resp.raise_for_status()
+            return await resp.read()
 ```
 
 **Important:** Custom `SSLContext` changes need a comment linking to your TLS baseline. Never set `check_hostname = False` or `verify_mode = CERT_NONE` in production paths. For corporate CAs, load a dedicated bundle with `verify=` or `ctx.load_verify_locations()`—do not disable verification.

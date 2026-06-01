@@ -145,19 +145,20 @@ gin.SetMode(gin.DebugMode)  // in production
 
 ## Sample Vulnerable Code in Python
 
-```python
-# settings.py committed to the repository
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECRET_KEY = "hardcoded-in-repo-not-for-production"
+```ruby
+# config/environments/production.rb — committed unsafe defaults
+Rails.application.configure do
+  config.force_ssl = false
+  config.consider_all_requests_local = true
+  config.action_controller.allow_forgery_protection = false
+  config.session_store :cookie_store, key: "_app_session", secure: false, httponly: false
+end
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Open the primary config surface.** Compare production versus development files for debug flags, stack traces, and CORS `*`.
-2. **Trace the Python Django settings.** In the sample, debug mode, open hosts, and a hardcoded secret key are unsafe in any deployed environment.
+2. **Trace the Rails production config.** In the sample, debug-style errors, disabled CSRF, and insecure session cookies are unsafe in any deployed environment.
 3. **Verify CSRF protection.** Browser session cookie applications need CSRF on state-changing routes.
 4. **Check template auto-escape.** Search for explicit unsafe modes that bypass default encoding.
 5. **Review cookie flags.** Confirm `Secure`, `HttpOnly`, and `SameSite` on session identifiers in production.

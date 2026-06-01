@@ -141,25 +141,24 @@ if user == nil {
 ## Sample Vulnerable Code in Python
 
 ```python
-from flask import Flask, request, jsonify
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
-app = Flask(__name__)
-
-@app.post("/reset")
-def reset():
-    email = request.form["email"]
-    user = User.query.filter_by(email=email).first()
+@require_POST
+def password_reset(request):
+    email = request.POST["email"]
+    user = User.objects.filter(email=email).first()
     if not user:
         # Different message and status reveal that the email is not registered
-        return jsonify({"error": "No account with that email"}), 404
+        return JsonResponse({"error": "No account with that email"}, status=404)
     send_reset(user)
-    return jsonify({"ok": True})
+    return JsonResponse({"ok": True})
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Map login failure paths.** Compare message text, status codes, and lockout behavior for unknown username versus wrong password.
-2. **Trace the Python reset handler.** In the sample, a 404 with a specific error tells attackers the email is absent. Uniform messaging is required on public endpoints.
+2. **Trace the Django reset handler.** In the sample, a 404 with a specific error tells attackers the email is absent. Uniform messaging is required on public endpoints.
 3. **Review registration and invite flows.** Search for "email already registered" versus generic success responses.
 4. **Check MFA enrollment and device binding.** Hints when a user record is missing can leak account existence.
 5. **Measure side channels.** Email or SMS sent only when the account exists still leaks through timing if the code path differs.

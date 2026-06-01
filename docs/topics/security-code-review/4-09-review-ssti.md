@@ -141,19 +141,19 @@ from jinja2 import Environment, Template
 
 app = Flask(__name__)
 
-@app.route("/greet")
-def greet():
-    # Attacker-controlled name — may contain template syntax
-    name = request.args.get("name", "world")
+@app.route("/email/preview")
+def email_preview():
+    # Attacker-controlled subject line — may contain template syntax
+    subject = request.args.get("subject", "Your invoice")
     # Sink: user input concatenated into template source before compile
-    template = Template("Hello {{ " + name + " }}")
+    template = Template("Subject: {{ " + subject + " }}")
     return template.render()
 ```
 
 ## Step-by-Step Review Walkthrough
 
 1. **Search for templates built from strings.** Find `Template(userInput)`, `render_template_string`, `from_string`, and concatenation before compile.
-2. **Trace the Python (or equivalent) input path.** In the sample, `name` is embedded in template source. Payloads like `{{7*7}}` or sandbox escape probes execute on the server.
+2. **Trace the Python (or equivalent) input path.** In the sample, `subject` is embedded in template source. Payloads like `{{7*7}}` or sandbox escape probes execute on the server.
 3. **Review preview and customization features.** Email and notification editors that save and re-render user template source are high risk.
 4. **Inspect expression contexts.** `${}`, `{{}}`, SpEL, and inline eval-style directives in views accept attacker syntax when user data crosses layers.
 5. **Check data vs template separation.** User data should pass only as model variables while template files remain static on disk.
@@ -175,23 +175,26 @@ def greet():
 ### Java
 
 ```java
-public String renderUserTemplate(String userTpl, Map<String, Object> ctx) {
-    TemplateEngine engine = new TemplateEngine();
-    Context context = new Context();
-    ctx.forEach(context::setVariable);
-    return engine.process(userTpl, context); // userTpl is attacker-controlled source
+public String renderNewsletterPreview(String userSubject, Map<String, Object> ctx) {
+    Configuration cfg = new Configuration(Configuration.VERSION_2_3_32);
+    Template tpl = new Template("preview", "Newsletter: ${subject}", cfg);
+    ctx.put("subject", userSubject); // userSubject may contain ${...} directives
+    StringWriter out = new StringWriter();
+    tpl.process(ctx, out);
+    return out.toString();
 }
 ```
 
 ### C#
 
 ```csharp
-public IActionResult Preview([FromForm] string template)
+public IActionResult PreviewInvoice([FromForm] string headerHtml)
 {
     var engine = new RazorLightEngineBuilder()
         .UseMemoryCachingProvider()
         .Build();
-    var html = engine.CompileRenderStringAsync(Guid.NewGuid().ToString(), template, model).Result;
+    var html = engine.CompileRenderStringAsync(
+        Guid.NewGuid().ToString(), headerHtml, model).Result;
     return Content(html, "text/html");
 }
 ```
@@ -199,22 +202,22 @@ public IActionResult Preview([FromForm] string template)
 ### HTML
 
 ```html
-<!-- User-uploaded or form-submitted template compiled server-side -->
-<form action="/preview" method="post">
-  <textarea name="template">Hello {{name}}</textarea>
+<!-- Admin email preview compiles user-supplied header as template source -->
+<form action="/email/preview" method="post">
+  <textarea name="header">Invoice {{invoice_id}}</textarea>
   <!-- Attacker adds {{7*7}} or engine-specific directives -->
 </form>
 
-<!-- Email/HTML builder treats stored markup as template source -->
-<div>${userSnippet}</div>
+<!-- Notification builder treats stored snippet as template source -->
+<div>${userHeaderSnippet}</div>
 ```
 
 ### Go
 
 ```go
-func preview(w http.ResponseWriter, r *http.Request) {
-    snippet := r.FormValue("snippet")
-    tmpl, _ := template.New("preview").Parse("{{ define \"main\" }}" + snippet + "{{ end }}")
+func previewNewsletter(w http.ResponseWriter, r *http.Request) {
+    header := r.FormValue("header")
+    tmpl, _ := template.New("preview").Parse("{{ define \"main\" }}" + header + "{{ end }}")
     tmpl.ExecuteTemplate(w, "main", nil)
 }
 ```
@@ -230,15 +233,15 @@ from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
-@app.route("/greet")
-def greet():
-    name = request.args.get("name", "world")
-    return render_template("greet.html", name=name)
+@app.route("/email/preview")
+def email_preview():
+    subject = request.args.get("subject", "Your invoice")
+    return render_template("email_preview.html", subject=subject)
 ```
 
 ```html
-{# greet.html — static template file *#}
-Hello {{ name }}
+{# email_preview.html — static template file *#}
+<p>Subject: {{ subject }}</p>
 ```
 
 **Important:** Never call `Environment.from_string()` or `Template()` on HTTP request data. Use `FileSystemLoader` with static templates on disk.
@@ -246,7 +249,7 @@ Hello {{ name }}
 ```python
 # Rich text — sanitize, do not compile as template:
 import bleach
-clean_name = bleach.clean(name, tags=[], strip=True)
+clean_subject = bleach.clean(subject, tags=[], strip=True)
 ```
 
 ### Java
@@ -254,16 +257,16 @@ clean_name = bleach.clean(name, tags=[], strip=True)
 Precompile static templates from classpath resources. Pass user content via model attributes only.
 
 ```java
-@GetMapping("/preview")
-public String preview(@RequestParam String body, Model model) {
-    model.addAttribute("content", body); // data variable, not template source
-    return "preview"; // static preview.html with th:text="${content}"
+@GetMapping("/email/preview")
+public String preview(@RequestParam String subject, Model model) {
+    model.addAttribute("subject", subject); // data variable, not template source
+    return "email_preview"; // static email_preview.html with th:text="${subject}"
 }
 ```
 
 ```html
-<!-- preview.html -->
-<p th:text="${content}"></p>
+<!-- email_preview.html -->
+<p th:text="${subject}"></p>
 ```
 
 **Important:** Never call `TemplateEngine.process(String userTpl, ...)` on HTTP input. Avoid `th:utext` on untrusted fields.
@@ -273,14 +276,14 @@ public String preview(@RequestParam String body, Model model) {
 Ship precompiled Razor views. Do not compile arbitrary strings from users.
 
 ```cshtml
-@* Preview.cshtml — user content as encoded model field *@
-<div>@Model.Content</div>
+@* EmailPreview.cshtml — user content as encoded model field *@
+<p>@Model.Subject</p>
 ```
 
 ```csharp
-public IActionResult Preview(PreviewRequest request)
+public IActionResult Preview(EmailPreviewRequest request)
 {
-    return View(new PreviewViewModel { Content = request.Body });
+    return View(new EmailPreviewViewModel { Subject = request.Subject });
 }
 ```
 
@@ -294,12 +297,12 @@ Parse known template files at startup. Never `Parse(userInput)` on request bodie
 //go:embed templates/*
 var tmplFS embed.FS
 
-var greetTmpl = template.Must(
-    template.ParseFS(tmplFS, "templates/greet.html"))
+var emailTmpl = template.Must(
+    template.ParseFS(tmplFS, "templates/email_preview.html"))
 
-func greet(w http.ResponseWriter, r *http.Request) {
-    name := r.URL.Query().Get("name")
-    greetTmpl.Execute(w, struct{ Name string }{Name: name})
+func emailPreview(w http.ResponseWriter, r *http.Request) {
+    subject := r.URL.Query().Get("subject")
+    emailTmpl.Execute(w, struct{ Subject string }{Subject: subject})
 }
 ```
 
