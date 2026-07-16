@@ -74,6 +74,8 @@ Cookie: locale=<img src=x onerror=alert(1)>
 
 ### Pattern 6: DOM-based follow-on (when reflection lands in JS)
 
+See [4.3 Review DOM XSS](4-03-review-dom-xss.md) for client-side sources and sinks. Quick test strings when server output is parsed in the browser:
+
 ```text
 ?token=';alert(1)//
 ?nonce=</script><script>alert(1)</script>

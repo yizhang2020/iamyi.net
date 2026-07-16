@@ -24,7 +24,7 @@ Each topic chapter follows the same shape as Part III mini-chapters:
 - **Java and C#** appear first in other-language examples, then JavaScript, HTML, Go, SQL, Shell, or C when they apply.
 - **Fix** sections show real library and configuration patterns with official references.
 
-Related vulnerability-focused chapters: [4.16 JWT Security](4-16-review-jwt-security.md), [4.13 CSRF](4-13-review-csrf.md), [4.12 Cryptographic Implementation](4-12-review-cryptographic-implementation.md), [4.41 Insecure Coding Practice](4-41-review-insecure-coding-practice.md).
+Related vulnerability-focused chapters: [4.17 JWT Security](4-17-review-jwt-security.md), [4.14 CSRF](4-14-review-csrf.md), [4.13 Cryptographic Implementation](4-13-review-cryptographic-implementation.md), [4.42 Insecure Coding Practice](4-42-review-insecure-coding-practice.md).
 
 ## Identity and Federation
 

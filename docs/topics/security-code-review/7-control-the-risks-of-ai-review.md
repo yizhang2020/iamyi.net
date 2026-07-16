@@ -99,5 +99,7 @@ The reviewer must control hallucination, missing context, unsafe fixes, prompt i
 
 The safest rule is simple: AI can propose. Evidence decides.
 
+For a practical human gate between AI-generated leads and validated findings—including checklists that prevent shallow reports—see [Chapter 12 — Human-in-the-Loop AI Review](12-ai-review-human-in-the-loop-prevent-shallow-ai-report.md).
+
 Training and programmatic ownership still carry that rule into everyday work; the following two chapters explain how.
 

@@ -11,7 +11,7 @@ description: How to review secure JWT issuance and validation—RS256 signing, J
 
 ## 10.3 - Review JWT Implementation
 
-JWT implementation review covers how your service **issues** and **validates** tokens, not only whether parsing skips signature checks. Start at the authorization server: signing keys, algorithms, claim design, and refresh handling. Then trace every resource server that consumes those tokens. For parse-time flaws and algorithm confusion, also read [4.16 Review JWT Security](4-16-review-jwt-security.md).
+JWT implementation review covers how your service **issues** and **validates** tokens, not only whether parsing skips signature checks. Start at the authorization server: signing keys, algorithms, claim design, and refresh handling. Then trace every resource server that consumes those tokens. For parse-time flaws and algorithm confusion, also read [4.17 Review JWT Security](4-17-review-jwt-security.md).
 
 ## What This Topic Is
 
@@ -332,7 +332,7 @@ def refresh_tokens(presented_refresh: str) -> dict:
     return issue_tokens(claims["sub"], ["api"], refresh_family=claims["family"])
 ```
 
-**Important:** Resource servers validate with your JWKS URL and required `aud`. Pair with [4.16](4-16-review-jwt-security.md) checks for algorithm allowlists and `none` rejection.
+**Important:** Resource servers validate with your JWKS URL and required `aud`. Pair with [4.17](4-17-review-jwt-security.md) checks for algorithm allowlists and `none` rejection.
 
 ### Java
 
@@ -436,7 +436,7 @@ func validateAccess(raw string) (jwt.MapClaims, error) {
 - Every resource server validates **signature, iss, aud, exp** against current JWKS—not a shared HS256 secret.
 - Private keys live in **KMS/HSM**; rotation plan updates JWKS without invalidating all sessions instantly unless required.
 - Logout and account recovery **invalidate refresh families** or bump session version claims.
-- Cross-check [4.16 Review JWT Security](4-16-review-jwt-security.md) for consumer-side parse and algorithm flaws.
+- Cross-check [4.17 Review JWT Security](4-17-review-jwt-security.md) for consumer-side parse and algorithm flaws.
 
 ## Reference
 

@@ -32,7 +32,7 @@ This relates to [CWE-347](https://cwe.mitre.org/data/definitions/347.html) and [
 | **ACS URL / Recipient** | Missing `Recipient`/`Destination` validation, dynamic ACS from request param, wildcard ACS in metadata |
 | **Replay controls** | No `InResponseTo` check, assertion ID not tracked, clock skew unbounded |
 | **Conditions** | `NotOnOrAfter` ignored, `AudienceRestriction` missing or not matched to SP entity ID |
-| **XML processing** | XXE-enabled parsers, external DTD allowed—see [4.08 Review XXE](4-08-review-xxe.md) |
+| **XML processing** | XXE-enabled parsers, external DTD allowed—see [4.08 Review XXE](4-09-review-xxe.md) |
 | **Metadata exchange** | Unsigned metadata trusted, SP uploads attacker IdP metadata in self-service config |
 
 ## Abuse Scenarios

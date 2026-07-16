@@ -976,7 +976,7 @@ IDOR is also called horizontal privilege escalation
 
 #### Default Error Page and StackTrace Logging
 
-Vulnerable Code: Default error pages often contain information such as the server software name and version, e.g., Apache/2.4.41 (Ubuntu) Server. If the software has known vulnerabilities, this can aid an attacker in targeting the server.
+Vulnerable Code: Default error pages often contain information such as the server software name and version, e.g., Apache/2.4.42 (Ubuntu) Server. If the software has known vulnerabilities, this can aid an attacker in targeting the server.
 ```java
 try {
    ...
