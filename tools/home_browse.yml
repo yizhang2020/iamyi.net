@@ -59,6 +59,14 @@ incidents:
     title: 2026-08-26 OpenAI–Hugging Face agent intrusion
     summary: Eval agents reused mirrors and dataset pipelines—facts, surfaces, and controls.
 
+talks:
+  - path: talks/can-llms-do-security-code-review.md
+    title: Can LLMs do security code review?
+    summary: Invited deck on LLM-assisted review—help, limits, and where human judgment stays required.
+  - path: talks/compliance-from-the-perspective-of-security-in-plain-words.md
+    title: Compliance from the perspective of security (in plain words)
+    summary: Invited deck on explaining compliance in plain language from a security engineering view.
+
 whoami:
   - path: about/whoami.md
     title: Whoami

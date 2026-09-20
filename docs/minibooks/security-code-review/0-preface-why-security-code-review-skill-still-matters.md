@@ -11,6 +11,22 @@ description: Why classic security code review still matters, and how AI-assisted
 
 ## Preface - Why Security Code Review Skill Still Matters in the Age of AI
 
+### Overview
+
+AI-assisted coding increases who can ship software and how fast they ship it. More code with uneven security knowledge means more insecure implementations reach review—and “it compiles” is not evidence of safety.
+
+The points below frame the rest of this book.
+
+1. Working code is not the same as secure code; generated code often reproduces familiar insecure patterns with confident syntax.
+2. Classic security review questions—who controls the input, what boundary it crosses, what authority the code has—remain the core skill.
+3. Security engineering must prevent bad code at generation time and review resulting code at larger scale.
+4. AI can amplify review throughput when tasks are constrained; judgment and evidence still close the loop.
+5. The goal is defensible confidence: what was checked, what supports the claim, and what risk remains.
+
+After reading this preface, we should be able to explain why review skill still matters in the AI era and what this book will practice next.
+
+## The New Code Production Reality
+
 Software is the centerpiece of the internet age, and it will be the foundation of the AI era.
 
 AI-assisted coding changes who can create software. It also changes how fast they can create it. More code is now produced by more people, including non-traditional and less experienced programmers.
@@ -20,8 +36,6 @@ This creates a security problem. When more code is written faster, with uneven s
 Security code review still has the same function. It examines implementation and removes insecure code before it becomes production risk. But the role of security engineering must expand.
 
 Security engineers cannot only review code after it is generated. They also need to help prevent bad code from being generated in the first place. Secure coding needs to be built into the code generation process. Security engineers still review the resulting code, but they must do it at larger scale and faster pace.
-
-## The New Code Production Reality
 
 AI-assisted coding changes the economics of software creation. It reduces the distance between an idea and a working implementation. It also reduces the distance between an insecure idea and a working implementation.
 

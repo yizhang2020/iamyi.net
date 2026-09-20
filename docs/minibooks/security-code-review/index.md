@@ -9,17 +9,37 @@ description: Personal notes and articles about reviewing code for security issue
 
 ## Security Code Review (WIP)
 
-**Current version: 0.7**
+**Current version: 1.5**
 
-Use this topic as a practical guide to security code review, with a focus on manual review skill and AI-assisted review.
+### Overview
+
+AI-assisted coding increases how much software ships and how fast it changes. Security code review still has to decide whether implementation can be abused—not only whether it works—and do that with enough evidence to stand behind.
+
+The points below are the ideas this book uses again and again.
+
+1. Working code is not the same as safe code; review asks what happens when input, identity, or environment is hostile.
+2. Decomposition and data-flow tracing come before sink hunting: name the subsystem, trust boundary, and assumed control first.
+3. Related bug classes share one review model; family chapters teach the model once, then variants and appendices supply density.
+4. AI assistance scales hypothesis generation; humans still own validation, impact, and merge authority.
+5. Defensible confidence means stating what was checked, what evidence supports it, and what risk remains.
+
+After reading this book, we should be able to run a review from system map to code-level evidence, use AI without surrendering judgment, and explain findings in terms of abuse and impact.
 
 ## Version history
 
 | Version | Date | What changed |
 | --- | --- | --- |
+| **1.5** | 2026-09-20 | Combined Part VI into one chapter: developers as primary reviewers; progressive skill + lightweight practice with AI assist. |
+| **1.4** | 2026-09-20 | Shrunk Part V to two practical chapters (run AI-assisted review; keep it trustworthy). Removed experiment retelling and skills mini-chapter. Renumbered training/program to Ch8–9. |
+| **1.3** | 2026-09-20 | Reorganized Part V (Ch6–9 + 6.1) around guided vs simple LLM review: measured process gains, six guided practices, skills as process encoding, deterministic floor / human gate. |
+| **1.2** | 2026-09-20 | Renumbered chapters to match part order: Part IV = Ch5 (secure implementations), Part V = Ch6–9 (AI), Part VI = Ch10–11 (training/program). |
+| **1.1** | 2026-09-20 | Writing-style retrofit: Overview + core concepts + we/us outcomes on hubs, spine, and family chapters; index voice; Verify checklist transitions. |
+| **1.0** | 2026-09-20 | Consolidated Part IV from 7 topics into **3 family chapters** (identity/federation, tokens/API trust, transport/service identity) with a secure-implementations appendix. **Removed Part V (Chapter 11 platform configuration)** from this minibook. Renumbered AI assistance to Part V and training/governance to Part VI. |
+| **0.9** | 2026-09-20 | Consolidated Part III from 42 mini-chapters into **10 family chapters** (XSS, interpreter injection, parsers, files, authz/session, SSRF/egress, disclosure/logging, crypto, secrets/APIs, supply chain); appendix grouped to match. |
+| **0.8** | 2026-09-20 | Split Part III code density into an appendix: guiding mini-chapters keep definition, walkthrough, Python sample/fix, and verify; payloads, sinks, and multi-language catalogs move to [Appendix — Code-Level Reference](appendix/code-level-reference/index.md) with back-links from every chapter. |
 | **0.7** | 2026-05-31 | Diversified code examples across all `review-*` sub-chapters: unique scenarios, endpoints, libraries, and sink APIs per section so the same snippet does not repeat across chapters—broader attack-surface coverage for readers. |
 | **0.6** | 2026-05-31 | Added **attack payload** sections (and related abuse/misconfiguration examples) across all `review-*` sub-chapters—for inspiration during authorized testing and to show how flaws manifest in practice. Added **language-specific commands, functions, and APIs** (Python, Java, C#, JavaScript, HTML, Go, SQL, Shell, C) with short code samples per sink to enrich understanding of each vulnerability, not only generic patterns. |
-| **0.5** | 2026-05-31 | Added Part IV (Chapter 10: OAuth, OIDC, JWT, SAML, TLS, mTLS, API signing) and Part V (Chapter 11: Snowflake, Databricks clean room, AWS IAM, Kubernetes, PostgreSQL). Renumbered AI assistance to Part VI and training/governance to Part VII. Added mini-chapter 4.42 (insecure coding practice). Standardized vulnerable-example language order (Python walkthrough; Java and C# first, then JS/HTML/Go/SQL/Shell/C when applicable). |
+| **0.5** | 2026-05-31 | Added Part IV (Chapter 5: OAuth, OIDC, JWT, SAML, TLS, mTLS, API signing) and Part V (Chapter 11: Snowflake, Databricks clean room, AWS IAM, Kubernetes, PostgreSQL). Renumbered AI assistance to Part VI and training/governance to Part VII. Added mini-chapter 4.42 (insecure coding practice). Standardized vulnerable-example language order (Python walkthrough; Java and C# first, then JS/HTML/Go/SQL/Shell/C when applicable). |
 | **0.4** | 2026-05-31 | Split Chapter 4 into 40 code-level mini-chapters (4.1–4.41) with a shared review template: vulnerability characteristics, Python sample, step-by-step walkthrough, risk impact, multi-language examples, fix sections with library code, and official documentation references. Replaced the monolithic Chapter 4 body with a hub page and grouped MkDocs navigation. |
 | **0.3** | 2026-05-17 | “Version 2” reorganization: 11 main chapters (0–9 + conclusion), action-oriented titles, reader-centered part summaries in the index. Merged tracing and business-logic review into Chapter 3 (System Decomposition Methodology). Consolidated code-level review into a single Chapter 4 overview; renumbered AI and program chapters (5–9). |
 | **0.2** | 2026-05-13 | Editorial pass: removed per-chapter “Source References” sections pointing at the local archive; tightened cross-links. Added and applied the security code review writing style rule (short sentences, action headings, reader-centered intros). |
@@ -27,87 +47,63 @@ Use this topic as a practical guide to security code review, with a focus on man
 
 ## Preface
 
-This preface helps you see why security code review remains important as AI-assisted coding changes how software is written.
+The preface states why classic review skill still matters when AI accelerates code production.
 
 - [Why Security Code Review Skill Still Matters in the Age of AI](0-preface-why-security-code-review-skill-still-matters.md)
 
 ## Part I - Build the Reviewer Mindset
 
-This part helps you build the basic reviewer mindset. You will learn how security review uses trust boundaries, attacker-controlled input, and uncertainty reduction to reason about code.
+Part I builds the shared vocabulary: what security review is, and how we reduce uncertainty with trust boundaries and hostile assumptions.
 
 - [1. Define Security Code Review](1-what-security-code-review-is.md)
 - [2. Think Like a Security Reviewer](2-how-to-think-like-a-security-reviewer.md)
 
 ## Part II - Apply Security Review Methodology
 
-This part helps you break a system into reviewable subsystems. You will use business logic, authentication, authorization, and data-flow tracing to define boundaries and prepare for code-level review.
+Part II turns mindset into a map. We decompose the system into subsystems, then trace data across trust boundaries before opening random files.
 
 - [3. System Decomposition Methodology](3-system-decomposition-methodology.md)
 
 ## Part III - Review Code-Level Vulnerabilities
 
-This part takes the methodology down to the final implementation layer. Start with the chapter overview, then open the mini-chapter that matches the code you are reviewing. Each mini-chapter teaches how to read the code, how to phrase an LLM checklist, and which safer libraries apply in Java, Python, C#, and Go.
+Part III takes the methodology to the implementation layer. Ten **family** chapters teach how we review related bug classes; payloads and multi-language catalogs live in the [code-level appendix](appendix/code-level-reference/index.md).
 
-- [4. Review Code-Level Vulnerabilities (overview)](4-review-code-level-vulnerabilities.md)
-
-**Input, injection, and parsing:** [4.1 Stored XSS](4-01-review-stored-xss.md) · [4.2 Reflected XSS](4-02-review-reflected-xss.md) · [4.3 DOM XSS](4-03-review-dom-xss.md) · [4.4 SQL Injection](4-04-review-sql-injection.md) · [4.5 Command Injection](4-05-review-command-injection.md) · [4.6 Code Injection](4-06-review-code-injection.md) · [4.7 JSON Injection](4-07-review-json-injection.md) · [4.8 Dynamic JSP Inclusion](4-08-review-dynamic-jsp-inclusion.md) · [4.9 XXE](4-09-review-xxe.md) · [4.10 SSTI](4-10-review-ssti.md) · [4.11 Path Traversal](4-11-review-path-traversal.md) · [4.12 Client-Side Validation](4-12-review-client-side-validation.md)
-
-**Cryptography:** [4.13 Cryptographic Implementation](4-13-review-cryptographic-implementation.md)
-
-**Sessions and access control:** [4.14 CSRF](4-14-review-csrf.md) · [4.15 SSRF](4-15-review-ssrf.md) · [4.16 Broken Session Management](4-16-review-broken-session-management.md) · [4.17 JWT Security](4-17-review-jwt-security.md) · [4.18 Authentication and Authorization](4-18-review-authentication-and-authorization.md) · [4.19 Broken Password Lifecycle](4-19-review-broken-password-lifecycle.md) · [4.20 Forced Browsing](4-20-review-forced-browsing.md) · [4.21 IDOR](4-21-review-idor.md)
-
-**Information disclosure:** [4.22 Error Page Disclosure](4-22-review-error-page-disclosure.md) · [4.23 Sensitive Data in URL](4-23-review-sensitive-data-in-url.md) · [4.24 Username Enumeration](4-24-review-username-enumeration.md) · [4.25 Internal and Egress Exfiltration](4-25-review-internal-and-egress-exfiltration.md) · [4.26 Sensitive Logging](4-26-review-sensitive-logging.md)
-
-**File handling:** [4.27 Insecure Temporary Files](4-27-review-insecure-temporary-files.md) · [4.28 Insecure File Parsing](4-28-review-insecure-file-parsing.md) · [4.29 Insecure File Path Handling](4-29-review-insecure-file-path-handling.md) · [4.30 Insecure File Upload](4-30-review-insecure-file-upload.md)
-
-**Framework and insecure practices:** [4.42 Insecure Coding Practice](4-42-review-insecure-coding-practice.md) (TLS verify, JWT, cookies) · [4.31 Framework Secure Defaults](4-31-review-framework-secure-defaults.md) · [4.32 Sensitive Code Comments](4-32-review-sensitive-code-comments.md) · [4.33 Hardcoded Secrets](4-33-review-hardcoded-secrets.md) · [4.34 Insecure Cookie Configuration](4-34-review-insecure-cookie-configuration.md) · [4.35 Obsolete Code](4-35-review-obsolete-code.md) · [4.36 Dangerous Functions](4-36-review-dangerous-functions.md) · [4.37 Non-Standard Crypto](4-37-review-non-standard-crypto-practices.md) · [4.38 Insecure Deserialization](4-38-review-insecure-deserialization.md) · [4.39 Encryption Mistakes](4-39-review-encryption-decryption-mistakes.md)
-
-**Logging and supply chain:** [4.40 Secure Logging](4-40-review-secure-logging.md) · [4.41 Software Supply Chain](4-41-review-software-supply-chain.md)
+- [4. Review Code-Level Vulnerabilities (overview)](4-review-code-level-vulnerabilities.md) — map and consolidation table
+- [4.1 XSS](4-01-review-xss.md) · [4.2 Interpreter injection](4-02-review-interpreter-injection.md) · [4.3 Parsers](4-03-review-parsers-and-unsafe-reconstitution.md) · [4.4 Paths & files](4-04-review-paths-uploads-and-files.md) · [4.5 Authn / session / access](4-05-review-authentication-session-and-access.md)
+- [4.6 SSRF & egress](4-06-review-ssrf-and-egress.md) · [4.7 Disclosure & logging](4-07-review-information-disclosure-and-logging.md) · [4.8 Cryptography](4-08-review-cryptography-in-application-code.md) · [4.9 Secrets & dangerous APIs](4-09-review-secrets-defaults-and-dangerous-apis.md) · [4.10 Supply chain](4-10-review-software-supply-chain.md)
+- [Appendix — Code-Level Reference](appendix/code-level-reference/index.md)
 
 ## Part IV - Review Secure Implementations
 
-This part helps you review identity and transport implementations the way standards expect—not only whether a bug class exists in code. You will walk OAuth, OpenID Connect, JWT, SAML, TLS, mTLS, and API signing with the same evidence discipline as Part III.
+Part IV reviews identity and transport implementations the way standards expect—not only whether a bug class exists in code. Three **family** chapters cover federation, tokens/API trust, and transport/service identity; dense catalogs live in the [secure-implementations appendix](appendix/secure-implementations-reference/index.md).
 
-- [10. Review Secure Implementations (overview)](10-review-secure-implementations.md)
+- [5. Review Secure Implementations (overview)](5-review-secure-implementations.md)
+- [5.1 Identity & federation](5-01-review-identity-and-federation.md) · [5.2 Tokens & API trust](5-02-review-tokens-and-api-trust.md) · [5.3 Transport & service identity](5-03-review-transport-and-service-identity.md)
+- [Appendix — Secure Implementations Reference](appendix/secure-implementations-reference/index.md)
 
-**Identity and federation:** [10.1 OAuth 2.0](10-01-review-oauth-implementation.md) · [10.2 OpenID Connect](10-02-review-oidc-implementation.md) · [10.3 JWT Implementation](10-03-review-jwt-implementation.md) · [10.4 SAML](10-04-review-saml-federation.md)
+## Part V - Scale With AI Assistance
 
-**Transport and API trust:** [10.5 TLS and SSL Protocol](10-05-review-tls-ssl-protocol.md) · [10.6 mTLS](10-06-review-mtls-service-identity.md) · [10.7 API Keys and Signing](10-07-review-api-keys-and-request-signing.md)
+Part V teaches how to run AI-assisted security code review and how to keep it trustworthy. AI accelerates summaries, hypotheses, and drafts. Humans still own validation and merge authority. Deterministic scanners stay the floor.
 
-## Part V - Review Secure Configuration
+Companion talk: [Can LLMs do security code review?](../../talks/can-llms-do-security-code-review/index.md). For broader research trends and hybrid toolchains, see [Security Code Review Trends and Practices in the AI Era](../../essays/security-code-review-trend-and-practice-in-ai-era.md).
 
-This part helps you review platform and data-plane configuration when security depends on grants, network rules, and sharing boundaries—not only application logic.
+- [6. Run AI-Assisted Security Code Review](6-run-ai-assisted-security-code-review.md) — how to run the guided assist loop
+- [7. Keep AI Review Trustworthy](7-keep-ai-review-trustworthy.md) — leads vs findings, failure modes, hybrid gates
 
-- [11. Review Secure Configuration (overview)](11-review-secure-configuration.md)
+## Part VI - Grow Capability and Governance
 
-- [11.1 Snowflake](11-01-review-snowflake-security-configuration.md) · [11.2 Databricks Clean Room](11-02-review-databricks-clean-room-configuration.md) · [11.3 AWS IAM and Secrets](11-03-review-aws-iam-and-secrets-configuration.md) · [11.4 Kubernetes](11-04-review-kubernetes-security-configuration.md) · [11.5 PostgreSQL](11-05-review-postgresql-security-configuration.md)
+Part VI puts review skill where structural knowledge already lives: with developers. Train progressive security review, use AI under evidence gates, and keep lightweight ownership so coverage does not depend on a heroic AppSec bottleneck.
 
-## Part VI - Scale With AI Assistance
-
-This part scales what you practiced in Parts II–V—decomposition, tracing, code-level controls, implementations, and configuration—rather than swapping that order for brittle prompt magic. Artificial intelligence amplifies reviewers when tasks are constrained: summarized context, structured attack hypotheses, and evidence checks against concrete sources, sinks, and policies. Teams still need deterministic gates, calibrated trust in model output, and explicit governance so tooling does not outrun judgment.
-
-You can go deeper on research trends and a typical hybrid toolchain in [Security Code Review Trends and Practices in the AI Era](../../security-musings/security-code-review-trend-and-practice-in-ai-era.md).
-
-- [5. Use AI to Assist Human Review](5-use-ai-to-assist-human-review.md)
-- [6. Run Fully Automated LLM Review](6-run-fully-automated-llm-review.md)
-- [7. Control the Risks of AI Review](7-control-the-risks-of-ai-review.md)
-- [12. Human-in-the-Loop AI Review — Prevent Shallow Reports](12-ai-review-human-in-the-loop-prevent-shallow-ai-report.md)
-
-## Part VII - Grow Capability and Governance
-
-This part turns individual practice into sustained capability and clear ownership across the organization. Training gives reviewers repeatable habits that match Parts II–VI; the internal program aligns schedules, tooling, escalation, and risk acceptance, so review depth matches real risk—not heroics.
-
-- [8. Train Security Reviewers](8-train-security-reviewers.md)
-- [9. Build an Internal Review Program](9-build-an-internal-review-program.md)
+- [8. Enable Developers to Review Securely](8-enable-developers-to-review-securely.md)
 
 ## Conclusion
 
-The conclusion helps you connect the full path: review the code, explain the risk, test the evidence, and build defensible confidence.
+The conclusion ties the path together: review the code, explain the risk, test the evidence, and build defensible confidence.
 
 - [Build Defensible Confidence](conclusion-from-uncertainty-to-defensible-confidence.md)
 
 ## Reference
 
-Use this reference when you want to revisit the secure coding examples behind the chapters.
+The reference revisits secure coding examples that support the chapters.
 
 - [Secure Coding in Practice](secure-coding-in-practice.md)

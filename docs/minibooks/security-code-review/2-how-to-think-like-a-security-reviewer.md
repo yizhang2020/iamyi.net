@@ -11,19 +11,29 @@ description: Core principles that guide security review, including uncertainty r
 
 ## Chapter 2 - Think Like a Security Reviewer
 
-Security review is a way to reduce uncertainty.
+### Overview
 
-Security code review starts with an attacker in mind. This chapter explains how that mindset becomes a repeatable practice. The reviewer is not only looking for known bug patterns. The reviewer is testing assumptions.
+Security review is a way to reduce uncertainty. The work is not only hunting known bug patterns; it is testing assumptions about who controls data, where trust changes, and what happens when a control fails.
 
-That is the core objective. Security review asks what the code assumes, whether that assumption is safe, and what happens when the assumption is false.
+The points below are the ideas this chapter uses again and again.
+
+1. Make trust, attacker control, expected controls, and failure modes explicit.
+2. Think in threats (abuse) as well as bugs (defects).
+3. Separate assumption from evidence; verify on the server where the attacker cannot remove the check.
+4. Pay closest attention at trust boundaries.
+5. Prefer secure defaults and observable behavior over silent fail-open paths.
+
+After reading this chapter, we should be able to run a review as uncertainty reduction and reach defensible confidence about what was checked and what remains open.
 
 ## Reduce Uncertainty
+
+Security code review starts with an attacker in mind. This chapter turns that mindset into repeatable practice. Security review asks what the code assumes, whether that assumption is safe, and what happens when the assumption is false.
 
 Software always contains uncertainty.
 
 The reviewer may not know who controls an input. The developer may not know whether a downstream function trusts that input. The team may not know whether a feature can be reached in an unexpected order.
 
-Security review reduces that uncertainty by making questions explicit:
+Security review reduces that uncertainty by making questions explicit. The questions below keep the review honest.
 
 - What is trusted?
 - What is attacker-controlled?
@@ -31,7 +41,7 @@ Security review reduces that uncertainty by making questions explicit:
 - Where is that control enforced?
 - What happens if the control fails?
 
-The goal is not to prove perfect safety. The goal is to reach defensible confidence. A reviewer should be able to explain what was checked, what evidence was found, and what risk remains.
+The goal is not to prove perfect safety. The goal is to reach defensible confidence. We should be able to explain what was checked, what evidence was found, and what risk remains.
 
 ## Think in Threats, Not Only Bugs
 
@@ -57,14 +67,14 @@ An assumption sounds like this: "The user cannot change that value." Evidence so
 
 This difference matters. Many security issues happen when code trusts a value because the normal user interface does not expose it. Attackers are not limited to the normal interface.
 
-A reviewer should ask:
+The questions below connect implementation to trust.
 
 - Where does this value come from?
 - Can the user modify it?
 - Is it checked on the server?
 - Is the check close enough to the sensitive action?
 
-These questions prevent a review from becoming a checklist exercise. They force the reviewer to connect implementation to trust.
+These questions prevent a review from becoming a checklist exercise. They force the connection from implementation to trust.
 
 ## Respect Trust Boundaries
 

@@ -60,6 +60,14 @@
 </section>
 
 <section class="home-section">
+<h2 class="home-section__title">Talks</h2>
+<div class="home-grid home-grid--talks">
+<a class="home-card" href="talks/can-llms-do-security-code-review/"><span class="home-card__title">Can LLMs do security code review?</span><span class="home-card__summary">Invited deck on LLM-assisted review—help, limits, and where human judgment stays required.</span></a>
+<a class="home-card" href="talks/compliance-from-the-perspective-of-security-in-plain-words/"><span class="home-card__title">Compliance from the perspective of security (in plain words)</span><span class="home-card__summary">Invited deck on explaining compliance in plain language from a security engineering view.</span></a>
+</div>
+</section>
+
+<section class="home-section">
 <h2 class="home-section__title">Incidents</h2>
 <div class="home-grid home-grid--incidents">
 <a class="home-card" href="incidents/2026-08-26-openai-huggingface-agent-intrusion/"><span class="home-card__title">2026-08-26 OpenAI–Hugging Face agent intrusion</span><span class="home-card__summary">Eval agents reused mirrors and dataset pipelines—facts, surfaces, and controls.</span></a>

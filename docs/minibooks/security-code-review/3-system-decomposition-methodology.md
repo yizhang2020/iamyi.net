@@ -11,13 +11,23 @@ description: A practical chapter on decomposing a system into reviewable subsyst
 
 ## Chapter 3 - System Decomposition Methodology
 
-Security review starts by making a large system understandable.
+### Overview
 
-The reviewer should not begin by reading random files. A useful review starts by decomposing the system into smaller subsystems that have clear business purpose, functional responsibility, and security boundaries.
+Security review starts by making a large system understandable. Opening random files wastes time; useful review begins by decomposing the system into subsystems with clear business purpose, functional responsibility, and security boundaries.
 
-This chapter teaches that decomposition method. It combines business logic review, authentication and authorization review, and data-flow tracing into one workflow. The result is a map that tells the reviewer where code belongs, where data crosses boundaries, and where security controls must be verified.
+The points below are the ideas this chapter uses again and again.
+
+1. Start from system purpose, then define internal structure and candidate subsystems.
+2. Review business logic and authentication/authorization intent before file layout.
+3. Trace data flows across trust boundaries and name the controls that must exist at each crossing.
+4. Group code under the subsystem it supports so findings stay contextual.
+5. Produce a map that tells where to verify controls before diving into sinks.
+
+After reading this chapter, we should be able to build a subsystem map, place a change on that map, and know which boundaries and controls to verify next.
 
 ## Start With the Complete System
+
+This chapter combines business logic review, authentication and authorization review, and data-flow tracing into one workflow. The result is a map that shows where code belongs, where data crosses boundaries, and where security controls must be verified.
 
 System decomposition starts with the system as one object.
 

@@ -84,6 +84,18 @@ def main() -> int:
             "</section>",
             "",
             '<section class="home-section">',
+            '<h2 class="home-section__title">Talks</h2>',
+            '<div class="home-grid home-grid--talks">',
+        ]
+    )
+    for item in cfg.get("talks") or []:
+        lines.append(card(item["path"], item["title"], item["summary"]))
+    lines.extend(
+        [
+            "</div>",
+            "</section>",
+            "",
+            '<section class="home-section">',
             '<h2 class="home-section__title">Incidents</h2>',
             '<div class="home-grid home-grid--incidents">',
         ]

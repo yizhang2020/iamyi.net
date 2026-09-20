@@ -42,15 +42,15 @@ BOOKS: dict[str, dict[str, Any]] = {
     "security-code-review": {
         "id": "security-code-review",
         "label": "Security Code Review",
-        "rel": Path("docs") / "topics" / "security-code-review",
+        "rel": Path("docs") / "minibooks" / "security-code-review",
         "exclude_names": {"index.md"},
-        "exclude_dir_names": {"_eval", "eval-history", "materials"},
+        "exclude_dir_names": {"_eval", "eval-history", "materials", "appendix", "minibook"},
         "exclude_name_prefixes": ("_template",),
     },
     "hackers-mindset": {
         "id": "hackers-mindset",
         "label": "Hacker's Mindset",
-        "rel": Path("docs") / "topics" / "hackers-mindset",
+        "rel": Path("docs") / "minibooks" / "hackers-mindset",
         "exclude_names": {"index.md"},
         "exclude_dir_names": {"_eval", "eval-history", "materials"},
         "exclude_name_prefixes": ("_template",),

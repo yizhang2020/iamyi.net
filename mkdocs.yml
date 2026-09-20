@@ -24,6 +24,7 @@ extra_css:
   - stylesheets/nav-tabs.css
   - stylesheets/site-polish.css
   - stylesheets/home-browse.css
+  - stylesheets/talk-viewer.css
 
 docs_dir: docs
 site_dir: site
@@ -69,7 +70,7 @@ theme:
         name: Switch to dark mode
     - scheme: slate
       primary: teal
-      accent: amber
+      accent: amber 
       toggle: 
         icon: material/brightness-4
         name: Switch to light mode
@@ -84,6 +85,7 @@ theme:
 
 extra_javascript:
   - javascripts/nav-accordion.js
+  - javascripts/talk-viewer.js
 
 markdown_extensions:
     - meta
@@ -132,88 +134,53 @@ nav:
               - "3. System Decomposition Methodology": minibooks/security-code-review/3-system-decomposition-methodology.md
           - "Part III - Review Code-Level Vulnerabilities":
               - "4. Review Code-Level Vulnerabilities (overview)": minibooks/security-code-review/4-review-code-level-vulnerabilities.md
-              - "Input, injection, and parsing":
-                  - "4.1 Review Stored XSS": minibooks/security-code-review/4-01-review-stored-xss.md
-                  - "4.2 Review Reflected XSS": minibooks/security-code-review/4-02-review-reflected-xss.md
-                  - "4.3 Review DOM XSS": minibooks/security-code-review/4-03-review-dom-xss.md
-                  - "4.4 Review SQL Injection": minibooks/security-code-review/4-04-review-sql-injection.md
-                  - "4.5 Review Command Injection": minibooks/security-code-review/4-05-review-command-injection.md
-                  - "4.6 Review Code Injection": minibooks/security-code-review/4-06-review-code-injection.md
-                  - "4.7 Review JSON Injection": minibooks/security-code-review/4-07-review-json-injection.md
-                  - "4.8 Review Dynamic JSP Inclusion": minibooks/security-code-review/4-08-review-dynamic-jsp-inclusion.md
-                  - "4.9 Review XXE": minibooks/security-code-review/4-09-review-xxe.md
-                  - "4.10 Review SSTI": minibooks/security-code-review/4-10-review-ssti.md
-                  - "4.11 Review Path Traversal": minibooks/security-code-review/4-11-review-path-traversal.md
-                  - "4.12 Review Client-Side Validation": minibooks/security-code-review/4-12-review-client-side-validation.md
-              - "Cryptography":
-                  - "4.13 Review Cryptographic Implementation": minibooks/security-code-review/4-13-review-cryptographic-implementation.md
-              - "Sessions and access control":
-                  - "4.14 Review CSRF": minibooks/security-code-review/4-14-review-csrf.md
-                  - "4.15 Review SSRF": minibooks/security-code-review/4-15-review-ssrf.md
-                  - "4.16 Review Broken Session Management": minibooks/security-code-review/4-16-review-broken-session-management.md
-                  - "4.17 Review JWT Security": minibooks/security-code-review/4-17-review-jwt-security.md
-                  - "4.18 Review Authentication and Authorization": minibooks/security-code-review/4-18-review-authentication-and-authorization.md
-                  - "4.19 Review Broken Password Lifecycle": minibooks/security-code-review/4-19-review-broken-password-lifecycle.md
-                  - "4.20 Review Forced Browsing": minibooks/security-code-review/4-20-review-forced-browsing.md
-                  - "4.21 Review IDOR": minibooks/security-code-review/4-21-review-idor.md
-              - "Information disclosure":
-                  - "4.22 Review Error Page Disclosure": minibooks/security-code-review/4-22-review-error-page-disclosure.md
-                  - "4.23 Review Sensitive Data in URL": minibooks/security-code-review/4-23-review-sensitive-data-in-url.md
-                  - "4.24 Review Username Enumeration": minibooks/security-code-review/4-24-review-username-enumeration.md
-                  - "4.25 Review Internal and Egress Exfiltration": minibooks/security-code-review/4-25-review-internal-and-egress-exfiltration.md
-                  - "4.26 Review Sensitive Logging": minibooks/security-code-review/4-26-review-sensitive-logging.md
-              - "File handling":
-                  - "4.27 Review Insecure Temporary Files": minibooks/security-code-review/4-27-review-insecure-temporary-files.md
-                  - "4.28 Review Insecure File Parsing": minibooks/security-code-review/4-28-review-insecure-file-parsing.md
-                  - "4.29 Review Insecure File Path Handling": minibooks/security-code-review/4-29-review-insecure-file-path-handling.md
-                  - "4.30 Review Insecure File Upload": minibooks/security-code-review/4-30-review-insecure-file-upload.md
-              - "Framework and insecure practices":
-                  - "4.42 Review Insecure Coding Practice": minibooks/security-code-review/4-42-review-insecure-coding-practice.md
-                  - "4.31 Review Framework Secure Defaults": minibooks/security-code-review/4-31-review-framework-secure-defaults.md
-                  - "4.32 Review Sensitive Code Comments": minibooks/security-code-review/4-32-review-sensitive-code-comments.md
-                  - "4.33 Review Hardcoded Secrets": minibooks/security-code-review/4-33-review-hardcoded-secrets.md
-                  - "4.34 Review Insecure Cookie Configuration": minibooks/security-code-review/4-34-review-insecure-cookie-configuration.md
-                  - "4.35 Review Obsolete Code": minibooks/security-code-review/4-35-review-obsolete-code.md
-                  - "4.36 Review Dangerous Functions": minibooks/security-code-review/4-36-review-dangerous-functions.md
-                  - "4.37 Review Non-Standard Crypto Practices": minibooks/security-code-review/4-37-review-non-standard-crypto-practices.md
-                  - "4.38 Review Insecure Deserialization": minibooks/security-code-review/4-38-review-insecure-deserialization.md
-                  - "4.39 Review Encryption and Decryption Mistakes": minibooks/security-code-review/4-39-review-encryption-decryption-mistakes.md
-              - "Logging and supply chain":
-                  - "4.40 Review Secure Logging": minibooks/security-code-review/4-40-review-secure-logging.md
-                  - "4.41 Review Software Supply Chain": minibooks/security-code-review/4-41-review-software-supply-chain.md
+              - "4.1 Review XSS": minibooks/security-code-review/4-01-review-xss.md
+              - "4.2 Review Interpreter Injection": minibooks/security-code-review/4-02-review-interpreter-injection.md
+              - "4.3 Review Parsers and Unsafe Reconstitution": minibooks/security-code-review/4-03-review-parsers-and-unsafe-reconstitution.md
+              - "4.4 Review Paths, Uploads, and Files": minibooks/security-code-review/4-04-review-paths-uploads-and-files.md
+              - "4.5 Review Authentication, Session, and Access": minibooks/security-code-review/4-05-review-authentication-session-and-access.md
+              - "4.6 Review SSRF and Egress": minibooks/security-code-review/4-06-review-ssrf-and-egress.md
+              - "4.7 Review Information Disclosure and Logging": minibooks/security-code-review/4-07-review-information-disclosure-and-logging.md
+              - "4.8 Review Cryptography in Application Code": minibooks/security-code-review/4-08-review-cryptography-in-application-code.md
+              - "4.9 Review Secrets, Defaults, and Dangerous APIs": minibooks/security-code-review/4-09-review-secrets-defaults-and-dangerous-apis.md
+              - "4.10 Review Software Supply Chain": minibooks/security-code-review/4-10-review-software-supply-chain.md
           - "Part IV - Review Secure Implementations":
-              - "10. Review Secure Implementations (overview)": minibooks/security-code-review/10-review-secure-implementations.md
-              - "Identity and federation":
-                  - "10.1 Review OAuth 2.0 Implementation": minibooks/security-code-review/10-01-review-oauth-implementation.md
-                  - "10.2 Review OpenID Connect Implementation": minibooks/security-code-review/10-02-review-oidc-implementation.md
-                  - "10.3 Review JWT Implementation": minibooks/security-code-review/10-03-review-jwt-implementation.md
-                  - "10.4 Review SAML Federation": minibooks/security-code-review/10-04-review-saml-federation.md
-              - "Transport and API trust":
-                  - "10.5 Review TLS and SSL Protocol": minibooks/security-code-review/10-05-review-tls-ssl-protocol.md
-                  - "10.6 Review mTLS and Service Identity": minibooks/security-code-review/10-06-review-mtls-service-identity.md
-                  - "10.7 Review API Keys and Request Signing": minibooks/security-code-review/10-07-review-api-keys-and-request-signing.md
-          - "Part V - Review Secure Configuration":
-              - "11. Review Secure Configuration (overview)": minibooks/security-code-review/11-review-secure-configuration.md
-              - "11.1 Review Snowflake Security Configuration": minibooks/security-code-review/11-01-review-snowflake-security-configuration.md
-              - "11.2 Review Databricks Clean Room Configuration": minibooks/security-code-review/11-02-review-databricks-clean-room-configuration.md
-              - "11.3 Review AWS IAM and Secrets Configuration": minibooks/security-code-review/11-03-review-aws-iam-and-secrets-configuration.md
-              - "11.4 Review Kubernetes Security Configuration": minibooks/security-code-review/11-04-review-kubernetes-security-configuration.md
-              - "11.5 Review PostgreSQL Security Configuration": minibooks/security-code-review/11-05-review-postgresql-security-configuration.md
-          - "Part VI - Scale With AI Assistance":
-              - "5. Use AI to Assist Human Review": minibooks/security-code-review/5-use-ai-to-assist-human-review.md
-              - "5.1 AI Review Skills Research": minibooks/security-code-review/5-01-ai-review-skills-research.md
-              - "6. Run Fully Automated LLM Review": minibooks/security-code-review/6-run-fully-automated-llm-review.md
-              - "7. Control the Risks of AI Review": minibooks/security-code-review/7-control-the-risks-of-ai-review.md
-              - "12. Human-in-the-Loop AI Review — Prevent Shallow Reports": minibooks/security-code-review/12-ai-review-human-in-the-loop-prevent-shallow-ai-report.md
-          - "Part VII - Grow Capability and Governance":
-              - "8. Train Security Reviewers": minibooks/security-code-review/8-train-security-reviewers.md
-              - "9. Build an Internal Review Program": minibooks/security-code-review/9-build-an-internal-review-program.md
+              - "5. Review Secure Implementations (overview)": minibooks/security-code-review/5-review-secure-implementations.md
+              - "5.1 Review Identity and Federation": minibooks/security-code-review/5-01-review-identity-and-federation.md
+              - "5.2 Review Tokens and API Trust": minibooks/security-code-review/5-02-review-tokens-and-api-trust.md
+              - "5.3 Review Transport and Service Identity": minibooks/security-code-review/5-03-review-transport-and-service-identity.md
+          - "Part V - Scale With AI Assistance":
+              - "6. Run AI-Assisted Security Code Review": minibooks/security-code-review/6-run-ai-assisted-security-code-review.md
+              - "7. Keep AI Review Trustworthy": minibooks/security-code-review/7-keep-ai-review-trustworthy.md
+          - "Part VI - Grow Capability and Governance":
+              - "8. Enable Developers to Review Securely": minibooks/security-code-review/8-enable-developers-to-review-securely.md
           - "Conclusion - Build Defensible Confidence": minibooks/security-code-review/conclusion-from-uncertainty-to-defensible-confidence.md
+          - "Appendix - Code-level reference":
+              - minibooks/security-code-review/appendix/code-level-reference/index.md
+              - "4.1 XSS": minibooks/security-code-review/appendix/code-level-reference/4-01-review-xss.md
+              - "4.2 Interpreter injection": minibooks/security-code-review/appendix/code-level-reference/4-02-review-interpreter-injection.md
+              - "4.3 Parsers": minibooks/security-code-review/appendix/code-level-reference/4-03-review-parsers-and-unsafe-reconstitution.md
+              - "4.4 Paths & files": minibooks/security-code-review/appendix/code-level-reference/4-04-review-paths-uploads-and-files.md
+              - "4.5 Authn / session / access": minibooks/security-code-review/appendix/code-level-reference/4-05-review-authentication-session-and-access.md
+              - "4.6 SSRF & egress": minibooks/security-code-review/appendix/code-level-reference/4-06-review-ssrf-and-egress.md
+              - "4.7 Disclosure & logging": minibooks/security-code-review/appendix/code-level-reference/4-07-review-information-disclosure-and-logging.md
+              - "4.8 Cryptography": minibooks/security-code-review/appendix/code-level-reference/4-08-review-cryptography-in-application-code.md
+              - "4.9 Secrets & APIs": minibooks/security-code-review/appendix/code-level-reference/4-09-review-secrets-defaults-and-dangerous-apis.md
+              - "4.10 Supply chain": minibooks/security-code-review/appendix/code-level-reference/4-10-review-software-supply-chain.md
+          - "Appendix - Secure implementations reference":
+              - minibooks/security-code-review/appendix/secure-implementations-reference/index.md
+              - "5.1 Identity & federation": minibooks/security-code-review/appendix/secure-implementations-reference/5-01-review-identity-and-federation.md
+              - "5.2 Tokens & API trust": minibooks/security-code-review/appendix/secure-implementations-reference/5-02-review-tokens-and-api-trust.md
+              - "5.3 Transport & service identity": minibooks/security-code-review/appendix/secure-implementations-reference/5-03-review-transport-and-service-identity.md
           - "Reference - Secure Coding in Practice": minibooks/security-code-review/secure-coding-in-practice.md
   # Nested category → essay children are injected by mkdocs_hooks.on_config
   # from tools/home_browse.yml (keeps sidebar in sync with the Essays index).
   - Essays:
       - Browse: essays/index.md
+  - Talks:
+      - talks/index.md
+      - "Can LLMs do security code review?": talks/can-llms-do-security-code-review/index.md
+      - "Compliance from the perspective of security (in plain words)": talks/compliance-from-the-perspective-of-security-in-plain-words/index.md
   - Incidents:
       - incidents/index.md
       - "2026-08-26 OpenAI–Hugging Face Agent Intrusion": incidents/2026-08-26-openai-huggingface-agent-intrusion.md

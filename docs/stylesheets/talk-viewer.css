@@ -1,0 +1,84 @@
+/* Inline slide deck viewer for Talks pages */
+
+.talk-viewer {
+  margin: 1.25rem 0 1.75rem;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--md-default-fg-color) 3%, transparent);
+}
+
+.talk-viewer__stage {
+  position: relative;
+  background: #111;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.talk-viewer__stage img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.talk-viewer__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+  background: var(--md-default-bg-color);
+}
+
+.talk-viewer__nav {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.talk-viewer__btn {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
+  background: color-mix(in srgb, var(--md-default-fg-color) 4%, transparent);
+  color: var(--md-default-fg-color);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.talk-viewer__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 12%, transparent);
+  border-color: color-mix(in srgb, var(--md-primary-fg-color) 35%, transparent);
+}
+
+.talk-viewer__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.talk-viewer__status {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.talk-viewer__hint {
+  font-size: 0.75rem;
+  color: var(--md-default-fg-color--light);
+  opacity: 0.85;
+}
+
+@media (max-width: 40rem) {
+  .talk-viewer__hint {
+    display: none;
+  }
+}

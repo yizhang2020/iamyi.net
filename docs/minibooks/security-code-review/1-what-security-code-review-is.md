@@ -11,13 +11,25 @@ description: A short introduction to security code review as a deeper form of co
 
 ## Chapter 1 - Define Security Code Review
 
-Security code review is code review with an attacker in mind.
+### Overview
 
-General code review is a checkpoint for functionality, system quality, and shared understanding. Security code review keeps that foundation. It still asks whether the code is understandable and aligned with intent. Then it asks a harder question: what happens if the input, user, or environment is hostile? While functional code review focus on intended functionality, the security code review focus on unintended consiquence.
+Security code review is code review with an attacker in mind. Functional review asks whether a feature works; security review asks whether the feature can be abused when input, identity, or environment is hostile.
 
-This is what makes security review different. It does not only ask whether the feature works. It asks whether the feature can be abused.
+The points below are the ideas this chapter uses again and again.
+
+1. Correct behavior and safe behavior are related but not the same.
+2. Security questions start from attacker-controlled input, trust boundaries, and authority.
+3. Risk is explained through confidentiality, integrity, and availability impact.
+4. Working output is review evidence, not proof of safety.
+5. The reviewer states assumptions, evidence, and remaining uncertainty.
+
+After reading this chapter, we should be able to distinguish functional review from security review and state the questions that drive a security finding.
 
 ## Distinguish Correct Code From Safe Code
+
+Security code review keeps the foundation of general code review—understandability and alignment with intent—then asks a harder question: what happens if the input, user, or environment is hostile? Functional code review focuses on intended functionality; security code review focuses on unintended consequences.
+
+This is what makes security review different. It does not only ask whether the feature works. It asks whether the feature can be abused.
 
 Functional correctness and security are related, but they are not the same.
 
@@ -47,9 +59,7 @@ This example shows the difference. General review may ask whether the login work
 
 ## Ask Security Questions
 
-Security review starts with a different set of questions.
-
-A reviewer should ask:
+Security review starts with a different set of questions. The list below moves attention from intended behavior to abuse.
 
 - What input is attacker-controlled?
 - What trust boundary is crossed?

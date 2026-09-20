@@ -10,11 +10,21 @@ description: The conclusion to the security code review mini-book, tying togethe
 
 ## Conclusion - Build Defensible Confidence
 
-Security code review does not remove all uncertainty.
+### Overview
 
-That is not the goal.
+Security code review does not remove all uncertainty. That is not the goal. The goal is to reduce uncertainty until the team can make a defensible decision about what the system protects, what the attacker can control, and whether implementation enforces the intended controls.
 
-The goal is to reduce uncertainty until the team can make a defensible decision. The reviewer asks what the system is supposed to protect, what the attacker can control, what trust boundaries exist, and whether the implementation enforces the intended controls.
+The points below close the book.
+
+1. The same review pattern runs from mindset through methodology, code-level families, implementations, and AI assistance.
+2. Evidence beats confidence—whether the signal comes from a human, a scanner, or a model.
+3. AI changes volume and pace; it does not retire trust-boundary questions.
+4. Programs and training sustain the skill so coverage does not depend on heroics.
+5. Defensible confidence states what was checked, what supports the claim, and what remains open.
+
+After finishing this book, we should be able to reuse one review pattern end to end and leave proof the team can stand behind.
+
+## Why the Goal Is Confidence, Not Certainty
 
 This book began with a simple point: security review still matters in the age of AI. In fact, it matters more. More code is being produced by more people and more machines. The pace is faster. The volume is larger. The chance of insecure patterns being repeated is higher.
 

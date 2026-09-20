@@ -7,108 +7,61 @@ keywords:
   - path traversal
   - deserialization
   - code-level analysis
-description: Overview of code-level security review and an index of focused mini-chapters for each vulnerability family.
+description: Overview of code-level security review—ten family chapters plus a code-density appendix.
 ---
 
 ## Chapter 4 - Review Code-Level Vulnerabilities
 
-Code-level security analysis is the final layer of the methodology.
+### Overview
 
-The methodology chapter defined structure, modeled subsystem threats, traced data, and checked business logic. This part moves into the code that implements the security controls. The reviewer now asks how individual variables, functions, libraries, parsers, and framework calls can turn attacker-controlled input into security impact.
+Code-level security analysis is the final layer of the methodology. Earlier chapters defined structure, modeled subsystem threats, traced data, and checked business logic. This part asks how variables, functions, libraries, parsers, and framework calls turn attacker-controlled input into security impact.
 
-The goal is not to memorize every bug class. The goal is to learn a repeatable pattern: trace the data, identify the trust boundary, find the unsafe assumption, and verify the control.
+The goal is not to memorize every CWE. The points below are the ideas Part III uses again and again.
 
-## How to Use the Mini-Chapters
+1. Trace data from source to sink across a trust boundary before labeling a bug class.
+2. Related vulnerabilities share one failure model; learn the model once, then adjust sources and sinks per variant.
+3. Separate input validation from output encoding (or parameterization) at the right context.
+4. Record source, sink, missing control, impact, and a test that would prove a fix.
+5. Keep dense payloads and multi-language catalogs in the appendix so guiding chapters stay readable.
 
-Each vulnerability family below has its own standalone chapter. Every mini-chapter follows the same teaching pattern:
+After reading this overview and the family chapters, we should be able to review a code change by family, produce evidence-backed findings, and know when to open the appendix for density.
 
-1. **What the flaw is** — definition and CWE mapping where applicable.
-2. **Vulnerability characteristics** — where the pattern appears in real codebases (features, sinks, weak controls).
-3. **Attack payloads** (or abuse scenarios) — representative test patterns for authorized security testing.
-4. **Language-specific sinks and dangerous APIs** — per-language libraries, calls, and system interfaces to search for, each with a short code sample.
-5. **Sample vulnerable code in Python** — one focused example to study first.
-6. **Step-by-step review walkthrough** — how to trace the flaw and why each step matters.
-7. **Risk impact analysis** — what can go wrong for users, data, and the business.
-8. **Vulnerable examples in other languages** — always **Java** and **C#** first; then, when applicable, **JavaScript**, **HTML**, and **Go**; then **SQL**, **Shell**, and **C**. The **Sample Vulnerable Code** section always uses **Python** for the primary walkthrough.
-9. **Fix: safer patterns and libraries** — real code using vetted APIs, with **Important** notes per language.
-10. **Verify during review** — evidence to collect before you file a finding.
-11. **Reference** — official documentation links for the libraries and standards cited in the fix section.
+## Ten Family Chapters (Consolidated)
 
-The archive article [Secure Coding in Practice](secure-coding-in-practice.md) remains available as background reading; mini-chapters do not link to it in their reference sections.
+Former forty-two mini-chapters are grouped into **ten families**. Each family shares one review model, lists variants with where-to-look tables, walks one primary example, and points to the appendix for payloads and multi-language catalogs.
 
-### Code diversity across examples
+| # | Family | Former mini-chapters (examples) |
+| --- | --- | --- |
+| [4.1](4-01-review-xss.md) | XSS | Stored, reflected, DOM |
+| [4.2](4-02-review-interpreter-injection.md) | Interpreter injection | SQL, command, code, JSON, SSTI |
+| [4.3](4-03-review-parsers-and-unsafe-reconstitution.md) | Parsers & reconstitution | XXE, dynamic JSP include, deserialization |
+| [4.4](4-04-review-paths-uploads-and-files.md) | Paths, uploads & files | Path traversal, upload, temp files, parsing |
+| [4.5](4-05-review-authentication-session-and-access.md) | Authn, session & access | CSRF, session, IDOR, JWT (code-level), cookies |
+| [4.6](4-06-review-ssrf-and-egress.md) | SSRF & egress | SSRF, internal/egress exfiltration |
+| [4.7](4-07-review-information-disclosure-and-logging.md) | Disclosure & logging | Errors, URLs, enumeration, logging, comments |
+| [4.8](4-08-review-cryptography-in-application-code.md) | Cryptography | Implementation, non-standard crypto, enc/dec mistakes |
+| [4.9](4-09-review-secrets-defaults-and-dangerous-apis.md) | Secrets, defaults & APIs | Secrets, dangerous functions, defaults, client-only validation |
+| [4.10](4-10-review-software-supply-chain.md) | Supply chain | Dependencies and build trust |
 
-Examples are intentionally varied across chapters. The same function call (for example `subprocess` with `shell=True`, `jwt.decode(..., verify_signature=False)`, or a generic `ping` wrapper) should not repeat in another mini-chapter unless this page shows a **vulnerable** pattern paired with a **fixed** contrast in the same section. Prefer different libraries, business scenarios, and sink APIs so readers see a wider attack surface—not one canonical snippet copied everywhere.
+## How to Use a Family Chapter
 
-## Input Validation, Injection, and Parsing
+The sequence below is the same for every family chapter.
 
-- [4.1 Review Stored XSS](4-01-review-stored-xss.md)
-- [4.2 Review Reflected XSS](4-02-review-reflected-xss.md)
-- [4.3 Review DOM XSS](4-03-review-dom-xss.md)
-- [4.4 Review SQL Injection](4-04-review-sql-injection.md)
-- [4.5 Review Command Injection](4-05-review-command-injection.md)
-- [4.6 Review Code Injection](4-06-review-code-injection.md)
-- [4.7 Review JSON Injection](4-07-review-json-injection.md)
-- [4.8 Review Dynamic JSP Inclusion](4-08-review-dynamic-jsp-inclusion.md)
-- [4.9 Review XXE](4-09-review-xxe.md)
-- [4.10 Review SSTI](4-10-review-ssti.md)
-- [4.11 Review Path Traversal](4-11-review-path-traversal.md)
-- [4.12 Review Client-Side Validation](4-12-review-client-side-validation.md)
+1. **Shared model** — the review question for the whole family.
+2. **Variants** — short definitions and where-to-look tables (former mini-topics).
+3. **Worked example** — one Python sample and step-by-step walkthrough.
+4. **Risk, fix principles, verify** — family-level evidence habits.
+5. **Appendix pointer** — payloads, sinks, and multi-language fixes.
 
-## Cryptography
+## Code-Level Appendix
 
-- [4.13 Review Cryptographic Implementation](4-13-review-cryptographic-implementation.md)
+Open the [Appendix — Code-Level Reference](appendix/code-level-reference/index.md) when density is needed. Each family has one appendix page with subsections for every former mini-chapter. Guiding chapters and appendix pages link both ways.
 
-## Sessions, Requests, and Access Control
-
-- [4.14 Review CSRF](4-14-review-csrf.md)
-- [4.15 Review SSRF](4-15-review-ssrf.md)
-- [4.16 Review Broken Session Management](4-16-review-broken-session-management.md)
-- [4.17 Review JWT Security](4-17-review-jwt-security.md)
-- [4.18 Review Authentication and Authorization](4-18-review-authentication-and-authorization.md)
-- [4.19 Review Broken Password Lifecycle](4-19-review-broken-password-lifecycle.md)
-- [4.20 Review Forced Browsing](4-20-review-forced-browsing.md)
-- [4.21 Review IDOR](4-21-review-idor.md)
-
-## Information Disclosure
-
-- [4.22 Review Error Page Disclosure](4-22-review-error-page-disclosure.md)
-- [4.23 Review Sensitive Data in URL](4-23-review-sensitive-data-in-url.md)
-- [4.24 Review Username Enumeration](4-24-review-username-enumeration.md)
-- [4.25 Review Internal and Egress Exfiltration](4-25-review-internal-and-egress-exfiltration.md)
-- [4.26 Review Sensitive Logging](4-26-review-sensitive-logging.md)
-
-## File and Path Handling
-
-- [4.27 Review Insecure Temporary Files](4-27-review-insecure-temporary-files.md)
-- [4.28 Review Insecure File Parsing](4-28-review-insecure-file-parsing.md)
-- [4.29 Review Insecure File Path Handling](4-29-review-insecure-file-path-handling.md)
-- [4.30 Review Insecure File Upload](4-30-review-insecure-file-upload.md)
-
-## Framework and Configuration
-
-- [4.31 Review Framework Secure Defaults](4-31-review-framework-secure-defaults.md)
-
-## Insecure Coding Practices
-
-- [4.42 Review Insecure Coding Practice](4-42-review-insecure-coding-practice.md) — TLS verification, JWT signature/key handling, cookie flags, and related habits
-- [4.32 Review Sensitive Code Comments](4-32-review-sensitive-code-comments.md)
-- [4.33 Review Hardcoded Secrets](4-33-review-hardcoded-secrets.md)
-- [4.34 Review Insecure Cookie Configuration](4-34-review-insecure-cookie-configuration.md)
-- [4.35 Review Obsolete Code](4-35-review-obsolete-code.md)
-- [4.36 Review Dangerous Functions](4-36-review-dangerous-functions.md)
-- [4.37 Review Non-Standard Crypto Practices](4-37-review-non-standard-crypto-practices.md)
-- [4.38 Review Insecure Deserialization](4-38-review-insecure-deserialization.md)
-- [4.39 Review Encryption and Decryption Mistakes](4-39-review-encryption-decryption-mistakes.md)
-
-## Logging and Supply Chain
-
-- [4.40 Review Secure Logging](4-40-review-secure-logging.md)
-- [4.41 Review Software Supply Chain](4-41-review-software-supply-chain.md)
+The archive article [Secure Coding in Practice](secure-coding-in-practice.md) remains available as background reading.
 
 ## Core Review Habits
 
-Most code-level findings still start with data flow:
+Most code-level findings still start with data flow. The questions below keep the review grounded.
 
 - Where does the data come from?
 - What code transforms it?
@@ -117,11 +70,8 @@ Most code-level findings still start with data flow:
 
 Separate **input validation** from **output encoding**. Validation decides whether data is acceptable for the application. Encoding makes data safe for a specific output context (HTML, SQL, shell, URL).
 
-When you finish a mini-chapter, record source, sink, missing control, impact, and a test that proves the fix.
+When we finish a family chapter, we should be able to record source, sink, missing control, impact, and a test that proves the fix.
 
-## Next: Secure Implementations and Configuration
+## Next: Secure Implementations
 
-After code-level patterns, continue with:
-
-- [Chapter 10 - Review Secure Implementations](10-review-secure-implementations.md) — OAuth, OIDC, JWT, SAML, TLS, mTLS, API signing
-- [Chapter 11 - Review Secure Configuration](11-review-secure-configuration.md) — Snowflake, Databricks clean rooms, AWS IAM, Kubernetes, PostgreSQL
+After code-level patterns, continue with [Chapter 5 - Review Secure Implementations](5-review-secure-implementations.md)—identity and federation, tokens and API trust, and transport and service identity.

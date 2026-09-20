@@ -5,7 +5,7 @@
 }
 
 .home-section {
-  margin: 0 0 2.25rem;
+  margin: 0 0 3.25rem;
 }
 
 .home-section__title {
@@ -26,6 +26,7 @@
 }
 
 .home-grid--incidents,
+.home-grid--talks,
 .home-grid--whoami {
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
 }
@@ -104,6 +105,7 @@
   .home-grid--books,
   .home-grid--essays,
   .home-grid--incidents,
+  .home-grid--talks,
   .home-grid--whoami {
     grid-template-columns: 1fr;
   }
