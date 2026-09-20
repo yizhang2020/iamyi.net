@@ -1,0 +1,225 @@
+/* Site-wide content polish: calm, readable, a bit more editorial — not loud. */
+
+:root {
+  --site-rule: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  --site-rule-strong: color-mix(in srgb, var(--md-primary-fg-color) 45%, transparent);
+  --site-muted: color-mix(in srgb, var(--md-default-fg-color) 62%, var(--md-default-bg-color));
+  --site-inset: color-mix(in srgb, var(--md-primary-fg-color) 6%, var(--md-default-bg-color));
+}
+
+/* ---- Typography rhythm ---- */
+.md-typeset {
+  line-height: 1.7;
+  letter-spacing: 0.005em;
+}
+
+.md-typeset p,
+.md-typeset li {
+  letter-spacing: 0.01em;
+}
+
+.md-typeset h1 {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 0.85em;
+}
+
+.md-typeset h2 {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  padding-bottom: 0.35rem;
+  margin-top: 1.75em;
+  border-bottom: 1px solid var(--site-rule);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.45em;
+}
+
+.md-typeset h2 + h3 {
+  margin-top: 1em;
+}
+
+/* Lead / first paragraph after title feels slightly quieter */
+.md-typeset > h1 + p {
+  font-size: 1.02em;
+  color: var(--site-muted);
+}
+
+/* ---- Lists ---- */
+.md-typeset ul > li,
+.md-typeset ol > li {
+  margin-bottom: 0.35em;
+}
+
+.md-typeset li::marker {
+  color: color-mix(in srgb, var(--md-primary-fg-color) 70%, var(--md-default-fg-color));
+}
+
+/* Home / index “title — summary” lines */
+.md-typeset li > a {
+  font-weight: 600;
+}
+
+/* ---- Rules & quotes ---- */
+.md-typeset hr {
+  border: 0;
+  height: 1px;
+  margin: 2rem 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--site-rule-strong) 12%,
+    var(--site-rule-strong) 88%,
+    transparent
+  );
+}
+
+.md-typeset blockquote {
+  border-left: 3px solid var(--md-primary-fg-color);
+  background: var(--site-inset);
+  border-radius: 0 0.35rem 0.35rem 0;
+  padding: 0.55rem 1rem;
+  color: var(--site-muted);
+  quotes: none;
+}
+
+.md-typeset blockquote > :first-child {
+  margin-top: 0.2em;
+}
+
+.md-typeset blockquote > :last-child {
+  margin-bottom: 0.2em;
+}
+
+/* ---- Code ---- */
+.md-typeset code {
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.86em;
+  background-color: color-mix(
+    in srgb,
+    var(--md-code-bg-color, var(--md-default-fg-color)) 8%,
+    var(--md-default-bg-color)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-default-fg-color) 10%, transparent);
+}
+
+.md-typeset pre > code {
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+.md-typeset .highlight,
+.md-typeset pre:not(.highlight) {
+  border-radius: 0.4rem;
+  border: 1px solid var(--site-rule);
+  box-shadow: none;
+}
+
+/* ---- Figures / images ---- */
+.md-typeset img {
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 1px var(--site-rule);
+}
+
+.md-typeset figure {
+  margin: 1.25em 0;
+}
+
+.md-typeset figcaption,
+.md-typeset img + em,
+.md-typeset p > em:only-child {
+  display: block;
+  margin-top: 0.45em;
+  font-size: 0.84em;
+  color: var(--site-muted);
+  text-align: center;
+  font-style: normal;
+}
+
+/* Caption pattern used on this site: italic line after image */
+.md-typeset p:has(> img) + p > em:only-child,
+.md-typeset p:has(> a > img) + p > em:only-child {
+  display: block;
+  text-align: center;
+  color: var(--site-muted);
+  font-size: 0.84em;
+  font-style: normal;
+}
+
+/* ---- Sidebar polish ---- */
+.md-nav__link {
+  border-radius: 0.25rem;
+}
+
+.md-nav__item .md-nav__link--active {
+  font-weight: 650;
+}
+
+.md-nav--primary .md-nav__title {
+  letter-spacing: 0.02em;
+}
+
+/* ---- Content header / footer ---- */
+.md-header__topic:first-child {
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.md-footer {
+  border-top: 1px solid var(--site-rule);
+}
+
+.md-source-file {
+  color: var(--site-muted);
+  font-size: 0.78rem;
+}
+
+/* ---- Tab icons: CSS only (avoid doubling Material page-icon SVGs) ---- */
+.md-tabs__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Hide Material-injected tab SVGs; we draw one glyph via ::before */
+.md-tabs__link > svg {
+  display: none !important;
+}
+
+.md-tabs__link::before {
+  content: "";
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  background-color: currentColor;
+  opacity: 0.9;
+  -webkit-mask: var(--tab-icon) center / contain no-repeat;
+  mask: var(--tab-icon) center / contain no-repeat;
+}
+
+.md-tabs__item:nth-child(1) .md-tabs__link {
+  --tab-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'/%3E%3C/svg%3E");
+}
+.md-tabs__item:nth-child(2) .md-tabs__link {
+  --tab-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z'/%3E%3C/svg%3E");
+}
+.md-tabs__item:nth-child(3) .md-tabs__link {
+  --tab-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
+}
+.md-tabs__item:nth-child(4) .md-tabs__link {
+  --tab-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z'/%3E%3C/svg%3E");
+}
+.md-tabs__item:nth-child(5) .md-tabs__link {
+  --tab-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E");
+}
+
+/* ---- Definition-ish bold labels in essay lists ---- */
+.md-typeset strong {
+  font-weight: 650;
+}

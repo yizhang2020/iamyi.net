@@ -1,0 +1,31 @@
+/* Minibook edition chrome: version + PDF download on every minibook page */
+.minibook-edition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  margin: 0 0 1.25rem;
+  padding: 0.55rem 0 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  font-size: 0.82rem;
+}
+
+.minibook-edition__version {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.minibook-edition__date,
+.minibook-edition__hint,
+.minibook-edition__sep {
+  color: var(--md-default-fg-color--light);
+}
+
+.minibook-edition__pdf {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.minibook-edition__pdf:hover {
+  text-decoration: underline;
+}

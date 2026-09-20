@@ -1,21 +1,16 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # iamyi.net
 
 `iamyi.net` is my personal profile site and a collection of my personal writings about security.
 
 The content here is primarily focused on application security, cloud security, GenAI and ML security, security architecture, and related research notes.
 
-## Latest writing
-
---8<-- "includes/latest-writing.md"
-
-## Browse by section
-
-| Section | What you will find |
-| --- | --- |
-| [Whoami](about/whoami.md) | Short profile and how to interpret this site. |
-| [Topics → GenAI & ML security](topics/genai-ml-security/index.md) | Longer, theme-led notes (starting with framing secure GenAI/ML). |
-| [Security musings](security-musings/index.md) | Essays and notes on security engineering practice and role. |
-| [Incidents & trends](incidents/index.md) | Timely analysis of reports, breaches, and technical shifts. |
+--8<-- "includes/home-browse.md"
 
 ## License
 

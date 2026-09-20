@@ -1,0 +1,3 @@
+# Sidebar nesting (category → essay) is built by mkdocs_hooks from
+# tools/home_browse.yml. This file only documents the folder; do not list pages
+# here or awesome-pages will fight the injected nav.

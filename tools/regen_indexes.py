@@ -8,8 +8,8 @@ from pathlib import Path
 
 SCRIPTS: list[tuple[str, bool]] = [
     ("tools/gen_cases_index.py", False),
-    ("tools/gen_security_musings_index.py", True),
-    ("tools/gen_latest_writing.py", True),
+    ("tools/gen_essays_index.py", True),
+    ("tools/gen_home_browse.py", True),
 ]
 
 

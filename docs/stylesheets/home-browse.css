@@ -1,0 +1,114 @@
+/* Landing page: category grids of title + one-liner cards */
+
+.home-browse {
+  margin: 0.5rem 0 2rem;
+}
+
+.home-section {
+  margin: 0 0 2.25rem;
+}
+
+.home-section__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.85rem;
+  color: var(--md-default-fg-color);
+}
+
+.home-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-grid--books {
+  grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+}
+
+.home-grid--incidents,
+.home-grid--whoami {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.home-grid--essays {
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+}
+
+.home-essay-row {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--md-default-fg-color) 3%, transparent);
+}
+
+.home-essay-row__title {
+  font-size: 0.92rem;
+  font-weight: 650;
+  margin: 0 0 0.65rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--md-primary-fg-color) 22%, transparent);
+  border-radius: 0.45rem;
+  background: var(--md-default-bg-color);
+  text-decoration: none !important;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+  min-height: 5.5rem;
+}
+
+.home-card:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 0.35rem 0.9rem color-mix(in srgb, var(--md-default-fg-color) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.home-card__title {
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1.3;
+  color: var(--md-primary-fg-color);
+}
+
+.home-card__summary {
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--md-default-fg-color--light);
+}
+
+.home-card--compact {
+  min-height: 4.5rem;
+  padding: 0.75rem 0.85rem;
+  border-color: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  background: var(--md-default-bg-color);
+}
+
+.home-card--compact .home-card__title {
+  font-size: 0.9rem;
+}
+
+.home-card--compact .home-card__summary {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 44rem) {
+  .home-grid--books,
+  .home-grid--essays,
+  .home-grid--incidents,
+  .home-grid--whoami {
+    grid-template-columns: 1fr;
+  }
+
+  .home-essay-row {
+    padding: 0.75rem;
+  }
+}

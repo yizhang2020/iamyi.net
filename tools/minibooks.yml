@@ -1,0 +1,22 @@
+# Minibook PDF metadata. Chapter order comes from mkdocs.yml nav.
+# version / version_date are the reader-facing topic edition (shown on every chapter).
+books:
+  genai-ml-security:
+    title: Secure GenAI & ML
+    subtitle: Personal notes on GenAI and ML application security
+    version: "0.9"
+    version_date: "2026-09-17"
+    pdf_filename: genai-ml-security.pdf
+  influence-first-ai-security:
+    title: Influence-First AI Security
+    subtitle: Trace influence. Bound authority.
+    version: "0.9.2"
+    version_date: "2026-09-20"
+    pdf_filename: influence-first-ai-security.pdf
+    cover_style: trace-lattice
+  security-code-review:
+    title: Security Code Review
+    subtitle: Manual review skill and AI-assisted practice
+    version: "0.9"
+    version_date: "2026-09-17"
+    pdf_filename: security-code-review.pdf

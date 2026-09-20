@@ -1,11 +1,35 @@
 {#-
   Ensures git revision dates (mkdocs-git-revision-date-localized-plugin) render
   on each page. Zensical’s bundled theme omits the default Material include.
+  Minibook chapters also get edition (version/date) and minibook PDF download.
 -#}
 {% include "partials/tags.html" %}
 {% include "partials/actions.html" %}
 {% if "\u003ch1" not in page.content %}
   <h1>{{ page.title | d(config.site_name, true)}}</h1>
+{% endif %}
+{% set uri = page.file.src_uri | replace("\\", "/") %}
+{% if uri.startswith("minibooks/") %}
+  {% set parts = uri.split("/") %}
+  {% if parts | length >= 2 %}
+    {% set topic = parts[1] %}
+    {% set meta = none %}
+    {% if config.extra and config.extra.minibooks %}
+      {% set meta = config.extra.minibooks.get(topic) %}
+    {% endif %}
+    {% set pdf_path = "minibooks/" ~ topic ~ "/minibook/" ~ topic ~ ".pdf" %}
+    <aside class="minibook-edition" aria-label="Minibook edition">
+      {% if meta and meta.version %}
+        <span class="minibook-edition__version">Version {{ meta.version }}</span>
+        {% if meta.version_date %}
+          <span class="minibook-edition__date">{{ meta.version_date }}</span>
+        {% endif %}
+        <span class="minibook-edition__sep" aria-hidden="true">·</span>
+      {% endif %}
+      <a class="minibook-edition__pdf" href="{{ pdf_path | url }}">Download minibook (PDF)</a>
+      <span class="minibook-edition__hint">Cover, contents, and all chapters</span>
+    </aside>
+  {% endif %}
 {% endif %}
 {{ page.content }}
 {% include "partials/source-file.html" %}

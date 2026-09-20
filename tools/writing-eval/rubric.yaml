@@ -1,0 +1,291 @@
+# Security Code Review mini-book evaluation rubric
+# Applies ONLY to docs/minibooks/security-code-review/**/*.md
+# Sources: security-code-review-writing-style.mdc + CS technical-book consensus
+# (Haberman & Wilson PLOS; Kernighan clarity; tutorial-over-reference; learner persona)
+
+version: 1
+scope: docs/minibooks/security-code-review
+also_scopes:
+  - docs/minibooks/hackers-mindset
+scope_note: >
+  Score only security-code-review and hackers-mindset topic books.
+  Do not score docs/essays, docs/minibooks/genai-ml-security, or any
+  other tree. Hacker's Mindset excludes materials/ and _template files.
+exclude_globs:
+  - index.md
+  - "**/_eval/**"
+  - "**/eval-history/**"
+  - "**/materials/**"
+  - "**/_template*"
+
+# Overall grade bands (0–100)
+grades:
+  excellent: { min: 90, label: Excellent }
+  strong: { min: 80, label: Strong }
+  good: { min: 70, label: Good }
+  needs_work: { min: 60, label: Needs work }
+  weak: { min: 0, label: Weak }
+
+# How levels combine
+aggregation:
+  # Chapter = word-weighted mean of section scores (70%) + chapter-only checks (30%)
+  chapter_section_weight: 0.70
+  chapter_file_weight: 0.30
+  # Book = mean of chapter scores (80%) + book-only checks (20%)
+  book_chapter_weight: 0.80
+  book_corpus_weight: 0.20
+
+categories:
+  readability:
+    name: Readability
+    weight: 0.20
+    objective: Easy to read
+    description: Short sentences, focused paragraphs, calm plain English.
+
+  structure:
+    name: Structure
+    weight: 0.20
+    objective: Logically structured
+    description: Heading spine, section mini-essays, smooth flow, verb-led titles.
+
+  precision:
+    name: Precision
+    weight: 0.15
+    objective: Technically precise
+    description: Specific claims, no vague/fear language, consistent terminology.
+
+  evidence:
+    name: Evidence
+    weight: 0.15
+    objective: Evidence-based
+    description: Correct citation tier; standards/papers linked when required.
+
+  practicality:
+    name: Practicality
+    weight: 0.15
+    objective: Useful to engineers in practice
+    description: Reviewer checks, real code/attack paths, actionable takeaways.
+
+  pedagogy:
+    name: Pedagogy
+    weight: 0.15
+    objective: Good technical-book craft
+    description: Tutorial skill path, durable principles, example-led teaching, focused audience.
+
+# Checks: each returns 0–100. Category score = mean of applicable checks.
+# levels: section | chapter | book
+checks:
+  # --- Readability ---
+  - id: sentence_soft_limit
+    category: readability
+    levels: [section, chapter]
+    type: auto
+    weight: 1.0
+    measure: "% of body sentences ≤ 50 words (soft target)"
+    pass_hint: "Rewrite sentences over 50 words; hard fail above 80."
+
+  - id: sentence_hard_limit
+    category: readability
+    levels: [section, chapter]
+    type: auto
+    weight: 1.5
+    measure: "No sentence exceeds 80 words (100 if none; 0 if any)"
+    pass_hint: "Split every 80+ word sentence."
+
+  - id: paragraph_soft_limit
+    category: readability
+    levels: [section, chapter]
+    type: auto
+    weight: 1.0
+    measure: "% of paragraphs ≤ 7 sentences"
+    pass_hint: "Split long paragraphs; hard fail above 9 sentences."
+
+  - id: paragraph_hard_limit
+    category: readability
+    levels: [section, chapter]
+    type: auto
+    weight: 1.5
+    measure: "No paragraph exceeds 9 sentences"
+    pass_hint: "Start a new paragraph after 9 sentences."
+
+  - id: calm_tone
+    category: readability
+    levels: [section, chapter]
+    type: auto
+    weight: 0.8
+    measure: "Absence of fear/hype words (catastrophic, destroys, completely breaks…)"
+    pass_hint: "Prefer risk language over alarmism."
+
+  # --- Structure ---
+  - id: heading_level_rules
+    category: structure
+    levels: [chapter]
+    type: auto
+    weight: 1.5
+    measure: "Body starts at ##; no #; no skipped levels; fences balanced"
+    pass_hint: "Use YAML title; first heading ##; close all fences."
+
+  - id: action_headings
+    category: structure
+    levels: [chapter]
+    type: auto
+    weight: 1.0
+    measure: "% of ##/### titles that are action-oriented or allowed noun forms"
+    pass_hint: "Prefer verb-led headings for skill chapters."
+
+  - id: section_spine
+    category: structure
+    levels: [section]
+    type: auto
+    weight: 1.2
+    measure: "Section has enough body (≥2 sentences) and is not a heading-only stub"
+    pass_hint: "Opening purpose + body + takeaway under each heading."
+
+  - id: list_discipline
+    category: structure
+    levels: [section, chapter]
+    type: auto
+    weight: 1.0
+    measure: "Bullet lists have 3–9 items; no flat list of 8+ without subgroups"
+    pass_hint: "Use prose for <3 items; regroup lists of 8+."
+
+  - id: front_matter
+    category: structure
+    levels: [chapter]
+    type: auto
+    weight: 0.8
+    measure: "YAML front matter with title (and description when present)"
+    pass_hint: "Add title/description/keywords front matter."
+
+  # --- Precision ---
+  - id: vague_language
+    category: precision
+    levels: [section, chapter]
+    type: auto
+    weight: 1.2
+    measure: "Low rate of vague fillers (basically, somehow, obviously, stuff, things)"
+    pass_hint: "Replace vague words with specific claims."
+
+  - id: absolute_security_claims
+    category: precision
+    levels: [section, chapter]
+    type: auto
+    weight: 1.2
+    measure: "Avoid bare 'this is secure/unsafe/vulnerable' without mechanism"
+    pass_hint: "Name threat, assumption, attacker control, impact."
+
+  - id: terminology_flags
+    category: precision
+    levels: [chapter]
+    type: auto
+    weight: 0.8
+    measure: "Does not casually mix authn/authz or encode/escape in same sentence without distinction"
+    pass_hint: "Keep authentication ≠ authorization; encoding ≠ escaping."
+
+  # --- Evidence ---
+  - id: citation_tier
+    category: evidence
+    levels: [chapter]
+    type: auto
+    weight: 1.5
+    measure: "Matches Tier A (inline CWE/OWASP) or Tier B (numbered ## References)"
+    pass_hint: "Skill chapters → CWE/OWASP; research/musings → [N](#ref-N) + References."
+
+  - id: standard_mapping
+    category: evidence
+    levels: [chapter]
+    type: auto
+    weight: 1.0
+    measure: "Vulnerability/review chapters map to CWE/OWASP/NIST when naming a class"
+    pass_hint: "Link CWE (or OWASP) at first definition."
+
+  - id: official_link_once
+    category: evidence
+    levels: [chapter]
+    type: auto
+    weight: 0.8
+    measure: "Heuristic: few duplicate identical markdown URLs in body"
+    pass_hint: "Link each official URL once in body; later mentions plain text."
+
+  # --- Practicality ---
+  - id: code_or_payload_examples
+    category: practicality
+    levels: [chapter]
+    type: auto
+    weight: 1.2
+    measure: "Has fenced code and/or attack/payload/review-check content when expected"
+    pass_hint: "Add concrete code, payloads, or reviewer checks."
+
+  - id: reviewer_focus
+    category: practicality
+    levels: [section, chapter]
+    type: auto
+    weight: 1.0
+    measure: "Mentions reviewer checks, trust boundary, attacker-controlled input, or similar"
+    pass_hint: "Connect analysis to what the reviewer should verify."
+
+  - id: actionable_verbs
+    category: practicality
+    levels: [section, chapter]
+    type: auto
+    weight: 0.8
+    measure: "Imperatives / check language present (check, verify, trace, confirm)"
+    pass_hint: "Tell the reader what to do next."
+
+  # --- Pedagogy (CS technical-book consensus) ---
+  - id: tutorial_not_reference_dump
+    category: pedagogy
+    levels: [chapter]
+    type: auto
+    weight: 1.0
+    measure: "Not a pure API/feature catalog; has explanatory prose around examples"
+    pass_hint: "Teach a skill path; do not ship bare reference tables."
+
+  - id: example_led
+    category: pedagogy
+    levels: [chapter]
+    type: auto
+    weight: 1.2
+    measure: "Code/example density in a useful band (not zero, not walls of uncommented code)"
+    pass_hint: "Short complete examples with explanation between them."
+
+  - id: durable_principles
+    category: pedagogy
+    levels: [chapter]
+    type: auto
+    weight: 1.0
+    measure: "Names durable concepts (trust boundary, source/sink, validation, authorization…)"
+    pass_hint: "Anchor on principles that outlive one tool version."
+
+  - id: focused_scope_signal
+    category: pedagogy
+    levels: [chapter]
+    type: auto
+    weight: 0.8
+    measure: "Chapter has a clear topic title and is not a kitchen-sink intro"
+    pass_hint: "One job per chapter; avoid fake beginner detours."
+
+  # --- Book-level ---
+  - id: book_coverage_balance
+    category: pedagogy
+    levels: [book]
+    type: auto
+    weight: 1.0
+    measure: "Parts present; chapters scored; weak chapters flagged"
+    pass_hint: "Raise lowest-scoring chapters first."
+
+  - id: book_nav_consistency
+    category: structure
+    levels: [book]
+    type: auto
+    weight: 1.0
+    measure: "index.md links resolve to existing chapter files"
+    pass_hint: "Fix broken index links; keep titles aligned."
+
+  - id: book_mean_readability
+    category: readability
+    levels: [book]
+    type: auto
+    weight: 1.0
+    measure: "Mean chapter readability ≥ target"
+    pass_hint: "Improve sentence/paragraph ceilings across weak chapters."

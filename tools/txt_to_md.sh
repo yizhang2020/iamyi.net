@@ -63,7 +63,7 @@ if [[ -f .venv/bin/activate ]]; then
 fi
 
 python tools/gen_cases_index.py || true
-python tools/gen_security_musings_index.py
+python tools/gen_essays_index.py
 python tools/gen_latest_writing.py
 mkdocs build --clean
 

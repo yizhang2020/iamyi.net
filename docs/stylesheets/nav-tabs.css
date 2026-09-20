@@ -1,0 +1,38 @@
+/* Top-level section tabs (Home, Minibooks, Essays, …): distinct strip under the header */
+
+.md-tabs {
+  /* Slightly deeper than the header so the strip reads as its own bar */
+  background-color: color-mix(in srgb, var(--md-primary-fg-color) 82%, #000 18%);
+  border-top: 1px solid color-mix(in srgb, #fff 18%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--md-accent-fg-color) 55%, #000 20%);
+  box-shadow: none;
+}
+
+.md-tabs__link {
+  color: color-mix(in srgb, var(--md-primary-bg-color) 78%, transparent);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px; /* sit on the strip’s bottom border */
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.md-tabs__link:hover,
+.md-tabs__link:focus {
+  color: var(--md-primary-bg-color);
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--md-primary-bg-color);
+  font-weight: 600;
+  /* Accent underline for the active section */
+  border-bottom-color: var(--md-accent-fg-color);
+}
+
+/* Dark (slate) scheme: keep the same structure with a lighter mix */
+[data-md-color-scheme="slate"] .md-tabs {
+  background-color: color-mix(in srgb, var(--md-primary-fg-color) 72%, #fff 10%);
+  border-top-color: color-mix(in srgb, #fff 12%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--md-accent-fg-color) 45%, transparent);
+}

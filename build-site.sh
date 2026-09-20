@@ -12,6 +12,9 @@ mkdocs-material
 pymdown-extensions
 mkdocs-git-revision-date-localized-plugin
 mkdocs-awesome-pages-plugin
+weasyprint
+Markdown
+PyYAML
 EOF
 
 if [[ ! -d .venv ]]; then

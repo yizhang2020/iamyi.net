@@ -1,0 +1,58 @@
+/* Whoami: org marks on career / education headings */
+.md-typeset h3.org-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.md-typeset h3.org-heading::before {
+  content: "";
+  display: inline-block;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  border-radius: 0.2rem;
+}
+
+/* Brand SVGs — mask so icons follow light/dark text color */
+.md-typeset h3.org-heading--aol::before,
+.md-typeset h3.org-heading--redhat::before,
+.md-typeset h3.org-heading--amazon::before {
+  background-color: currentColor;
+  background-image: none;
+}
+
+.md-typeset h3.org-heading--aol::before {
+  -webkit-mask: url("../assets/about/logos/aol.svg") center / contain no-repeat;
+  mask: url("../assets/about/logos/aol.svg") center / contain no-repeat;
+}
+
+.md-typeset h3.org-heading--redhat::before {
+  -webkit-mask: url("../assets/about/logos/redhat.svg") center / contain no-repeat;
+  mask: url("../assets/about/logos/redhat.svg") center / contain no-repeat;
+}
+
+.md-typeset h3.org-heading--amazon::before {
+  -webkit-mask: url("../assets/about/logos/amazon.svg") center / contain no-repeat;
+  mask: url("../assets/about/logos/amazon.svg") center / contain no-repeat;
+}
+
+/* Color marks (favicons) */
+.md-typeset h3.org-heading--ttd::before {
+  background-image: url("../assets/about/logos/thetradedesk.png");
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+}
+
+.md-typeset h3.org-heading--berkeley::before {
+  background-image: url("../assets/about/logos/berkeley.png");
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+}
+
+.md-typeset h3.org-heading--usc::before {
+  background-image: url("../assets/about/logos/usc.png");
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+}

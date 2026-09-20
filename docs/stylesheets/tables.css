@@ -18,15 +18,16 @@
 /* ---- Header row: centered, bold, primary-tint background ---- */
 .md-typeset table:not(.highlighttable):not(.no-site-table) thead th {
   text-align: center;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   vertical-align: middle;
-  padding: 0.65rem 0.9rem;
+  padding: 0.7rem 0.95rem;
   color: var(--md-default-fg-color);
-  border: 1px solid var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
-  /* Teal-tinted bar that tracks --md-primary-fg-color (theme primary) */
+  border: 1px solid color-mix(in srgb, var(--md-primary-fg-color) 28%, transparent);
+  /* Soft teal tint — light but readable against body rows */
   background-color: color-mix(
     in srgb,
-    var(--md-primary-fg-color) 18%,
+    var(--md-primary-fg-color) 22%,
     var(--md-default-bg-color)
   );
   border-bottom: 2px solid var(--md-primary-fg-color);
@@ -34,14 +35,15 @@
 
 /* ---- Body cells ---- */
 .md-typeset table:not(.highlighttable):not(.no-site-table) tbody td {
-  padding: 0.55rem 0.9rem;
-  border: 1px solid var(--md-typeset-table-color, rgba(0, 0, 0, 0.12));
+  padding: 0.6rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
   vertical-align: top;
 }
 
 /* First column in body: emphasize labels / row titles */
 .md-typeset table:not(.highlighttable):not(.no-site-table) tbody td:first-child {
-  font-weight: 700;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--md-default-fg-color) 92%, var(--md-primary-fg-color));
 }
 
 /* ---- Zebra rows (alternating shade) ---- */
@@ -52,7 +54,16 @@
 .md-typeset table:not(.highlighttable):not(.no-site-table) tbody tr:nth-child(even) {
   background-color: color-mix(
     in srgb,
-    var(--md-default-fg-color) 6%,
+    var(--md-primary-fg-color) 7%,
+    var(--md-default-bg-color)
+  );
+}
+
+/* Hover: light focus without flashy color */
+.md-typeset table:not(.highlighttable):not(.no-site-table) tbody tr:hover {
+  background-color: color-mix(
+    in srgb,
+    var(--md-accent-fg-color) 10%,
     var(--md-default-bg-color)
   );
 }
@@ -65,7 +76,7 @@
   tr:nth-child(even) {
   background-color: color-mix(
     in srgb,
-    var(--md-default-fg-color) 9%,
+    var(--md-primary-fg-color) 12%,
     var(--md-default-bg-color)
   );
 }
@@ -107,3 +118,67 @@
     color: #9aa0a6;
   }
 }
+
+/* ---- Security classification badges / tags ---- */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.35;
+  border-radius: 9999px;
+  vertical-align: baseline;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+/* Green: Permitted / normal usage */
+.badge-green {
+  background-color: #e6f4ea;
+  color: #137333;
+  border-color: #b7e1cd;
+}
+[data-md-color-scheme="slate"] .badge-green {
+  background-color: rgba(52, 211, 153, 0.18);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+/* Yellow: Warning, unexpected use but not hacking */
+.badge-yellow {
+  background-color: #fef7e0;
+  color: #b06000;
+  border-color: #fce293;
+}
+[data-md-color-scheme="slate"] .badge-yellow {
+  background-color: rgba(251, 191, 36, 0.18);
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+/* Red: Forbidden, credential misuse, or flaw exploited */
+.badge-red {
+  background-color: #fce8e6;
+  color: #c5221f;
+  border-color: #fad2cf;
+}
+[data-md-color-scheme="slate"] .badge-red {
+  background-color: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+/* Fixed-width badge for aligned lists and tables */
+.badge-fixed {
+  width: 11.5rem;
+  text-align: center;
+  box-sizing: border-box;
+  margin-right: 0.55rem;
+}
+
+/* Optional breathing room for reversed attack chain items */
+.md-typeset ol[reversed] li {
+  margin-bottom: 0.5rem;
+}
+
+

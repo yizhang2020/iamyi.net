@@ -1,0 +1,65 @@
+# Home browse + Essays index (consumed by tools/gen_home_browse.py
+# and tools/gen_essays_index.py).
+
+essay_category_order:
+  - Security engineering practice
+  - Mental models & threat modeling
+  - Security code review
+  - GenAI / ML security
+  - Compliance & research
+  - Templates
+
+# filename -> category (required for every essay under docs/essays/)
+essay_categories:
+  systematic-approach-on-product-security.md: Security engineering practice
+  security-tasks-prioritization.md: Security engineering practice
+  guardrails-and-security-engineers-role.md: Security engineering practice
+  security-as-coding-intelligence.md: Security engineering practice
+  understanding-vulnerability-threat-and-risk.md: Mental models & threat modeling
+  from-mental-model-to-security-model.md: Mental models & threat modeling
+  threat-modeling-car-firmware-update-via-usb-stick.md: Mental models & threat modeling
+  build-security-code-review-confidence-from-uncertain-to-certain.md: Security code review
+  security-code-review-trend-and-practice-in-ai-era.md: Security code review
+  how-to-end-to-end-mlmodel-and-genai-application-security.md: GenAI / ML security
+  study-note-the-developers-playbook-for-large-language-model-security.md: GenAI / ML security
+  study-note-prompt-engineering.md: GenAI / ML security
+  research-china-pipl-us-padfaa-doj-dsp-compliance.md: Compliance & research
+  template-security-architecture-review.md: Templates
+
+# Optional one-line overrides (else description / summary / first paragraph).
+essay_summaries:
+  systematic-approach-on-product-security.md: Turn shift-left ideals into repeatable product-security practice across phases and priorities.
+  security-tasks-prioritization.md: How capable engineers prioritize macro security work and micro risk signals.
+  guardrails-and-security-engineers-role.md: Four security-engineer roles from observer to gatekeeper—and how much each steers delivery.
+  security-as-coding-intelligence.md: Why AI-era development needs security as embedded rules and intentional friction.
+  understanding-vulnerability-threat-and-risk.md: Threat, vulnerability, and risk as a usable mental model—not interchangeable labels.
+  from-mental-model-to-security-model.md: Move from “how the system works” to “how it can fail” in reviews.
+  threat-modeling-car-firmware-update-via-usb-stick.md: USB firmware-update case study—structured threats beyond sign-and-encrypt.
+  build-security-code-review-confidence-from-uncertain-to-certain.md: A path from ambiguous code to defensible review confidence.
+  security-code-review-trend-and-practice-in-ai-era.md: Evidence and operating model for LLM-assisted review without abandoning human judgment.
+  how-to-end-to-end-mlmodel-and-genai-application-security.md: Lifecycle checklist for securing ML and GenAI applications end to end.
+  study-note-the-developers-playbook-for-large-language-model-security.md: Personal study companion to Wilson’s LLM security playbook (not a substitute for the book).
+  study-note-prompt-engineering.md: Notes on prompt/context engineering—what LLMs do and do not “understand.”
+  research-china-pipl-us-padfaa-doj-dsp-compliance.md: Working comparison of China PIPL and U.S. PADFAA / DOJ DSP for vendor and eng roles.
+  template-security-architecture-review.md: Reusable outline for application security architecture reviews.
+
+minibooks:
+  - path: minibooks/influence-first-ai-security/index.md
+    title: Influence-first AI security
+    summary: Trace influence and bound authority across models, harnesses, apps, and agents.
+  - path: minibooks/genai-ml-security/index.md
+    title: GenAI & ML security
+    summary: Minibook notes on securing GenAI and ML applications across the lifecycle.
+  - path: minibooks/security-code-review/index.md
+    title: Security code review
+    summary: Manual review skill, vulnerability patterns, and AI-assisted practice.
+
+incidents:
+  - path: incidents/2026-08-26-openai-huggingface-agent-intrusion.md
+    title: 2026-08-26 OpenAI–Hugging Face agent intrusion
+    summary: Eval agents reused mirrors and dataset pipelines—facts, surfaces, and controls.
+
+whoami:
+  - path: about/whoami.md
+    title: Whoami
+    summary: Short profile and how to interpret this site.

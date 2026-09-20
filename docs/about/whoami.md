@@ -6,6 +6,9 @@ keywords:
   - security engineering
 description: Short journey from QA to staff security engineer, graduate study, and why I write.
 date: 2026-05-01
+hide:
+  - navigation
+  - toc
 ---
 
 I’m a **security engineer** who started my career in quality engineering and test automation. Over time, I’ve grown from testing systems to securing them end-to-end.
@@ -16,21 +19,21 @@ This page is a short overview of that journey; the rest of the site dives deeper
 
 ## Background
 
-### AOL / Netscape (2004)
+### AOL / Netscape (2004) {: .org-heading .org-heading--aol }
 
 I began my career in 2004 at AOL/Netscape as a QA engineer, working on AOL Blog and AOL Uncut Video. My work focused on functional testing, API testing, and early DevOps practices.
 
 This was where I learned the fundamentals—test planning, automation, and disciplined engineering thinking—guided by a strong mentor, Orla Hegarty.
 
 
-### Red Hat (2007)
+### Red Hat (2007) {: .org-heading .org-heading--redhat }
 
 In 2007, I joined Red Hat as a system automation engineer on the Identity Management (IPA) project. I worked across a complex backend ecosystem—Kerberos, Samba, NFS, Apache, and more—owning end-to-end automation for distributed systems.
 
 During this time, I also earned my **RHCE certification** and developed a deep understanding of what high-quality, sustainable QA really means.
 
 
-### Amazon Lab126 (2013)
+### Amazon Lab126 (2013) {: .org-heading .org-heading--amazon }
 
 In 2013, I joined Amazon Lab126 as an early member of the device security team. I built the security lab, automation frameworks, and vulnerability management systems from scratch.
 
@@ -45,7 +48,28 @@ My work expanded into full lifecycle security, including:
 This is where I fully transitioned into **security engineering as a discipline**, moving beyond testing into proactive defense and system-level thinking.
 
 
-### Graduate Study — UC Berkeley (2020–2022)
+### The Trade Desk (2022–Present) {: .org-heading .org-heading--ttd }
+
+In 2022, I joined The Trade Desk as a **Staff Security Engineer**. Working in a smaller team expanded both my **scope and responsibility**—application security, infrastructure and cloud, data platforms, endpoints, testing programs, and vendor-facing controls.
+
+From day-to-day practice, the work has included:
+
+* **AI / ML security:** policies and governance for enterprise AI adoption (including RAG and agentic systems); security reviews of AI/ML pipelines and apps; translating policy into developer guidance, guardrails, and secure coding practices in the lifecycle
+* **Application security / SSDLC:** architecture and code reviews, penetration testing, and internal R&D training
+* **Infrastructure:** centralized PKI design and implementation; IT and data-center security consulting
+* **Cloud and data platforms:** IAM and key management; Snowflake and Databricks security; Kubernetes RBAC / policy
+* **Regulatory engineering:** turning legal and contractual data-processing constraints into enforceable controls and policies across legal, compliance, and engineering
+
+More recently, GenAI/ML and agentic systems have become a larger share of the work—new attack surfaces and a different way of thinking about risk.
+
+This role pushed me beyond specialization into a broader view of security. At first the breadth felt overwhelming. Over time it became clear that ambiguity isn’t something to eliminate; it is part of the job. Security in practice spans systems, people, and decisions under uncertainty.
+
+Today I feel closer to a grounded way of evaluating risk across domains and making decisions that hold up in the real world. I’m not claiming mastery, but I’m closer to the kind of engineer I’ve been working toward. This site exists in part because of that shift.
+
+Resume (PDF): [yi-zhang-resume-2026.pdf](yi-zhang-resume-2026.pdf)
+
+
+### Graduate Study — UC Berkeley (2020–2022) {: .org-heading .org-heading--berkeley }
 
 I returned to school to deepen my understanding, completing:
 
@@ -54,26 +78,8 @@ I returned to school to deepen my understanding, completing:
 
 This experience helped me shift from *knowing how* to understanding why—a critical step in my growth.
 
----
 
-### The Trade Desk (2023–Present)
-
-In 2023, I joined The Trade Desk as a **Staff Security Engineer**, and this has been the most transformative phase of my career so far.
-
-Working in a smaller team expanded both my **scope and responsibility**. I’ve been involved across a wide range of areas, including application security, infrastructure and cloud security, endpoint hardening, data platform security, penetration testing, bug bounty programs, and vendor-facing security work such as VPNs and gateways.
-
-More recently, I’ve also started working with **GenAI/ML and agentic security**, exploring how emerging systems introduce new attack surfaces and require different ways of thinking about risk.
-
-This role pushed me beyond specialization into a much broader view of security. At first, the breadth felt overwhelming—I wasn’t sure if I could cover everything effectively. But over time, something clicked: this ambiguity isn’t a problem to eliminate, it’s part of the job.
-
-Security in practice is not cleanly scoped. It spans systems, people, and decisions under uncertainty.
-
-Today, I feel closer than ever to a grounded understanding of how to evaluate risk across domains and make decisions that hold up in the real world. I’m not claiming mastery yet, but I’m getting close to the kind of engineer I’ve been working toward becoming.
-
-This site exists in part because of that shift—I’m now ready to share those perspectives openly.
-
-
-### Graduate Study — USC Gould School of Law (2025)
+### Graduate Study — USC Gould School of Law (2025) {: .org-heading .org-heading--usc }
 
 To complement my technical background, I pursued a Master of Legal Studies (MLS) focused on cybersecurity and privacy law.
 

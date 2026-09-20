@@ -139,7 +139,7 @@ def collect() -> list[tuple[datetime, str, str, str, str, Path]]:
         if rel_docs == "index.md":
             continue  # home page
         if path.name == "index.md":
-            continue  # section hub pages (topics/, security-musings/, incidents/)
+            continue  # section hub pages (minibooks/, essays/, incidents/)
         if rel_docs.startswith("includes/"):
             continue  # generated snippets, not articles
         if rel_docs in SKIP_REL:

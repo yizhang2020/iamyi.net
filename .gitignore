@@ -223,3 +223,10 @@ materials
 .obsidian/
 .DS_Store
 copilot/
+
+# Local WIP minibooks — keep on disk, do not publish
+docs/minibooks/hackers-mindset/
+docs/minibooks/ai-security-book-review/
+
+# Local WIP writing-eval history
+tools/writing-eval/history/hackers-mindset/
