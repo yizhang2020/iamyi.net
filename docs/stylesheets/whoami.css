@@ -56,3 +56,25 @@
   background-image: url("../assets/about/logos/usc.png");
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
 }
+
+/* Pull quotes — shared structure; variants differ by color */
+.md-typeset .whoami-quote {
+  margin: 1.1rem 0 1.25rem;
+  padding: 0.75rem 1rem 0.75rem 1.05rem;
+  border-left: 0.22rem solid var(--md-accent-fg-color);
+  background: color-mix(in srgb, var(--md-accent-fg-color) 10%, var(--md-default-bg-color));
+  border-radius: 0 0.3rem 0.3rem 0;
+  font-size: 1.05em;
+  font-weight: 650;
+  font-style: italic;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--md-default-fg-color);
+}
+
+/* Affirmation / personal rule — site teal (primary), not accent/warning */
+.md-typeset .whoami-quote--rule {
+  border-left-color: var(--md-primary-fg-color);
+  background: color-mix(in srgb, var(--md-primary-fg-color) 14%, var(--md-default-bg-color));
+  font-style: normal;
+}

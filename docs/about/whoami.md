@@ -115,7 +115,9 @@ I scheduled a meeting with my academic advisor and explained everything in detai
 
 The conversation was short.
 
-He listened, acknowledged that he understood the situation, and then said something along the lines of: *“I could help. But I won’t. This is your problem to solve.”*
+He listened, acknowledged that he understood the situation, and then said something along the lines of:
+
+<p class="whoami-quote" markdown="0">“I could, but I won’t. It is your problem to solve.”</p>
 
 That was it.
 
@@ -125,7 +127,7 @@ In the end, I took the only path available. I enrolled in community college cour
 
 But that experience shaped a simple rule for myself:
 
-**If I’m ever in a position to help someone in a small, reasonable way, I will.**
+<p class="whoami-quote whoami-quote--rule" markdown="0">If I can help reasonably, I will.</p>
 
 That’s the mindset I bring to writing here. If something I share saves you time, helps you think more clearly about a problem, or just makes a difficult situation feel a bit more manageable—that’s enough.
 
