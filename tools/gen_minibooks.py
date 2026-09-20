@@ -220,6 +220,74 @@ body {
 }
 .cover.cover-trace-lattice .meta p { margin: 0 0 1.5mm; }
 
+/* Shared abstract-cover layout (typography matches influence-first) */
+.cover.cover-signal-strata,
+.cover.cover-read-paths {
+  color: #f4f7f6;
+  padding: 42mm 22mm 26mm;
+}
+.cover.cover-signal-strata .cover-art,
+.cover.cover-read-paths .cover-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.cover.cover-signal-strata .cover-inner,
+.cover.cover-read-paths .cover-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 0;
+}
+.cover.cover-signal-strata .cover-brand,
+.cover.cover-read-paths .cover-brand {
+  opacity: 0.8;
+  letter-spacing: 0.18em;
+  margin: 0 0 52mm;
+}
+.cover.cover-signal-strata h1,
+.cover.cover-read-paths h1 {
+  font-weight: 600;
+  font-size: 32pt;
+  letter-spacing: -0.01em;
+  max-width: 16ch;
+  margin: 0 0 10mm;
+}
+.cover.cover-signal-strata .subtitle,
+.cover.cover-read-paths .subtitle {
+  font-family: "Source Serif 4", "Georgia", "Times New Roman", serif;
+  font-size: 14pt;
+  font-style: italic;
+  opacity: 0.9;
+  max-width: 28ch;
+  margin: 0 0 auto;
+}
+.cover.cover-signal-strata .meta,
+.cover.cover-read-paths .meta {
+  margin-top: 40mm;
+  opacity: 0.88;
+  font-size: 10pt;
+}
+.cover.cover-signal-strata .meta p,
+.cover.cover-read-paths .meta p { margin: 0 0 1.5mm; }
+
+/* Signal strata — GenAI / ML: cooler teal, layered bands + soft arcs */
+.cover.cover-signal-strata {
+  background:
+    linear-gradient(168deg, #0c3842 0%, #127078 40%, #1a7a72 68%, #0e454c 100%);
+}
+
+/* Read paths — security code review: warmer forest teal, panel columns + scan path */
+.cover.cover-read-paths {
+  background:
+    linear-gradient(162deg, #0e4038 0%, #15665c 38%, #1b7a68 70%, #124840 100%);
+}
+
 .copyright {
   page: copyright;
   padding-top: 28mm;
@@ -400,6 +468,139 @@ TRACE_LATTICE_SVG = """
 </svg>
 """
 
+# GenAI / ML — layered strata + soft signal arcs (cooler teal, muted gold)
+SIGNAL_STRATA_SVG = """
+<svg class="cover-art" viewBox="0 0 612 792" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Soft strata bands -->
+    <g stroke="#8fc4c8" stroke-width="0.55" opacity="0.22">
+      <path d="M40 180 H572"/>
+      <path d="M40 255 H572"/>
+      <path d="M40 330 H572"/>
+      <path d="M40 405 H572"/>
+      <path d="M40 480 H572"/>
+      <path d="M40 555 H572"/>
+      <path d="M40 630 H572"/>
+    </g>
+    <!-- Thicker mid-strata -->
+    <g stroke="#b8dde0" stroke-width="1.05" opacity="0.32">
+      <path d="M70 255 H540"/>
+      <path d="M90 405 H520"/>
+      <path d="M80 555 H530"/>
+    </g>
+    <!-- Soft arcs between layers (signal flow) -->
+    <g stroke="#cfe9eb" stroke-width="0.8" opacity="0.4">
+      <path d="M140 255 C180 290, 220 290, 260 330"/>
+      <path d="M320 255 C360 295, 400 295, 440 330"/>
+      <path d="M180 330 C220 365, 250 365, 290 405"/>
+      <path d="M360 330 C400 370, 430 370, 470 405"/>
+      <path d="M160 405 C200 445, 240 445, 280 480"/>
+      <path d="M340 405 C390 450, 430 450, 480 480"/>
+      <path d="M200 480 C250 520, 290 520, 340 555"/>
+      <path d="M380 480 C420 515, 450 515, 490 555"/>
+    </g>
+    <!-- Highlighted vertical transit (bounded column of attention) -->
+    <rect x="292" y="220" width="88" height="360" rx="6"
+          stroke="#b8953a" stroke-width="1.05" opacity="0.68" fill="none"/>
+    <rect x="292" y="220" width="88" height="360" rx="6"
+          stroke="#b8953a" stroke-width="0.35" opacity="0.3"
+          stroke-dasharray="2 5" fill="none"/>
+    <!-- Nodes on strata -->
+    <g stroke="#9ec9d0" stroke-width="0.85" fill="#127078" fill-opacity="0.4" opacity="0.78">
+      <circle cx="140" cy="255" r="3.5"/>
+      <circle cx="260" cy="330" r="3.5"/>
+      <circle cx="180" cy="330" r="3"/>
+      <circle cx="440" cy="330" r="3.5"/>
+      <circle cx="160" cy="405" r="3.5"/>
+      <circle cx="470" cy="405" r="3"/>
+      <circle cx="200" cy="480" r="3.5"/>
+      <circle cx="480" cy="480" r="3"/>
+      <circle cx="200" cy="555" r="3"/>
+      <circle cx="490" cy="555" r="3.5"/>
+      <circle cx="100" cy="180" r="3"/>
+      <circle cx="520" cy="180" r="3"/>
+      <circle cx="120" cy="630" r="3"/>
+      <circle cx="500" cy="630" r="3"/>
+    </g>
+    <!-- Nodes inside the attention column -->
+    <g stroke="#b8953a" stroke-width="1" fill="#0c3842" fill-opacity="0.55" opacity="0.95">
+      <circle cx="336" cy="255" r="5"/>
+      <circle cx="336" cy="330" r="4.5"/>
+      <circle cx="336" cy="405" r="5.5"/>
+      <circle cx="336" cy="480" r="4.5"/>
+      <circle cx="336" cy="555" r="5"/>
+    </g>
+    <g stroke="#e8f4f4" stroke-width="0.75" opacity="0.5">
+      <path d="M336 255 L336 555"/>
+    </g>
+  </g>
+</svg>
+"""
+
+# Security code review — panel columns + scan path (warmer forest teal, brighter brass)
+READ_PATHS_SVG = """
+<svg class="cover-art" viewBox="0 0 612 792" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Vertical panels (code surfaces) -->
+    <g stroke="#a8d4c8" stroke-width="0.7" opacity="0.28">
+      <rect x="72" y="140" width="92" height="520" rx="4"/>
+      <rect x="188" y="160" width="92" height="500" rx="4"/>
+      <rect x="304" y="130" width="92" height="540" rx="4"/>
+      <rect x="420" y="170" width="92" height="480" rx="4"/>
+    </g>
+    <!-- Faint line ticks inside panels -->
+    <g stroke="#c5e8de" stroke-width="0.45" opacity="0.22">
+      <path d="M88 190 H148 M88 220 H140 M88 250 H152 M88 280 H136 M88 310 H148"/>
+      <path d="M204 210 H264 M204 240 H256 M204 270 H268 M204 300 H250 M204 330 H262"/>
+      <path d="M320 180 H380 M320 210 H372 M320 240 H384 M320 270 H368 M320 300 H380"/>
+      <path d="M436 210 H496 M436 240 H488 M436 270 H500 M436 300 H484 M436 330 H494"/>
+      <path d="M88 360 H150 M88 390 H142 M88 420 H148"/>
+      <path d="M204 380 H266 M204 410 H258 M204 440 H264"/>
+      <path d="M320 350 H382 M320 380 H374 M320 410 H384"/>
+      <path d="M436 380 H498 M436 410 H490 M436 440 H496"/>
+      <path d="M88 470 H146 M88 500 H140 M88 530 H148"/>
+      <path d="M204 490 H262 M204 520 H256 M204 550 H264"/>
+      <path d="M320 460 H378 M320 490 H372 M320 520 H380 M320 550 H374"/>
+      <path d="M436 490 H494 M436 520 H488 M436 550 H496"/>
+    </g>
+    <!-- Soft cross-panel links -->
+    <g stroke="#d0ebe4" stroke-width="0.7" opacity="0.35">
+      <path d="M164 280 L188 300"/>
+      <path d="M280 360 L304 340"/>
+      <path d="M396 420 L420 400"/>
+      <path d="M164 480 L188 500"/>
+      <path d="M280 520 L304 500"/>
+    </g>
+    <!-- Review scan path (brass) weaving through panels -->
+    <path d="M118 210 L234 270 L350 330 L466 390 L350 470 L234 530 L118 590"
+          stroke="#d4a82e" stroke-width="1.15" opacity="0.72"/>
+    <path d="M118 210 L234 270 L350 330 L466 390 L350 470 L234 530 L118 590"
+          stroke="#d4a82e" stroke-width="0.4" opacity="0.32"
+          stroke-dasharray="2 5"/>
+    <!-- Hollow nodes along the scan -->
+    <g stroke="#d4a82e" stroke-width="1" fill="#0e4038" fill-opacity="0.55" opacity="0.95">
+      <circle cx="118" cy="210" r="4.5"/>
+      <circle cx="234" cy="270" r="5"/>
+      <circle cx="350" cy="330" r="5.5"/>
+      <circle cx="466" cy="390" r="5"/>
+      <circle cx="350" cy="470" r="4.5"/>
+      <circle cx="234" cy="530" r="5"/>
+      <circle cx="118" cy="590" r="4.5"/>
+    </g>
+    <!-- Quiet outer markers -->
+    <g stroke="#9bc9bc" stroke-width="0.8" fill="#15665c" fill-opacity="0.35" opacity="0.7">
+      <circle cx="118" cy="360" r="3"/>
+      <circle cx="234" cy="420" r="3"/>
+      <circle cx="350" cy="210" r="3"/>
+      <circle cx="466" cy="280" r="3"/>
+      <circle cx="466" cy="520" r="3"/>
+      <circle cx="54" cy="400" r="2.5"/>
+      <circle cx="548" cy="360" r="2.5"/>
+    </g>
+  </g>
+</svg>
+"""
+
 
 def build_book_html(meta: dict, chapters: list[dict], year: int) -> str:
     title = html.escape(meta["title"])
@@ -424,6 +625,12 @@ def build_book_html(meta: dict, chapters: list[dict], year: int) -> str:
     if cover_style == "trace-lattice":
         cover_classes = "cover cover-trace-lattice"
         cover_art = TRACE_LATTICE_SVG
+    elif cover_style == "signal-strata":
+        cover_classes = "cover cover-signal-strata"
+        cover_art = SIGNAL_STRATA_SVG
+    elif cover_style == "read-paths":
+        cover_classes = "cover cover-read-paths"
+        cover_art = READ_PATHS_SVG
 
     toc_items = []
     body_parts = []
