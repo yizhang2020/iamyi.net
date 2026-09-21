@@ -5,8 +5,9 @@ books:
     title: Secure GenAI & ML
     subtitle: Personal notes on GenAI and ML application security
     version: "0.9"
-    version_date: "2026-09-17"
+    version_date: "2026-09-20"
     pdf_filename: genai-ml-security.pdf
+    cover_style: signal-strata
   influence-first-ai-security:
     title: Influence-First AI Security
     subtitle: Trace influence. Bound authority.
@@ -17,6 +18,7 @@ books:
   security-code-review:
     title: Security Code Review
     subtitle: Manual review skill and AI-assisted practice
-    version: "0.9"
-    version_date: "2026-09-17"
+    version: "1.5"
+    version_date: "2026-09-20"
     pdf_filename: security-code-review.pdf
+    cover_style: read-paths
